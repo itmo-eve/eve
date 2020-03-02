@@ -5,6 +5,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/giggsoff/eveadm/eveadm"
 	"github.com/lf-edge/eve/pkg/pillar/cmd/baseosmgr"
 	"github.com/lf-edge/eve/pkg/pillar/cmd/client"
 	"github.com/lf-edge/eve/pkg/pillar/cmd/conntrack"
@@ -79,6 +80,8 @@ func main() {
 		tpmmgr.Run(ps)
 	case "vaultmgr":
 		vaultmgr.Run(ps)
+	case "eveadm":
+		eveadm.Run(ps)
 	default:
 		fmt.Printf("Unknown package: %s\n", basename)
 	}

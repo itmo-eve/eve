@@ -1,0 +1,252 @@
+{
+  "networks": [
+    {
+      "type": 4,
+      "ip": {
+        "dhcpRange": {},
+        "dhcp": 4
+      },
+      "id": "2e6038c1-ece6-4ffd-b95b-a7302c219d58"
+    },
+    {
+      "type": 4,
+      "ip": {
+        "dhcpRange": {},
+        "dhcp": 4
+      },
+      "id": "2e6038c1-ece6-4ffd-b95b-a7302c219d59"
+    }
+  ],
+  "reboot": {
+    "counter": 1000,
+    "desiredState": true
+  },
+  "deviceIoList": [
+    {
+      "logicallabel": "eth0",
+      "ptype": 1,
+      "type": 1,
+      "usage": 1,
+      "usagePolicy": {
+        "freeUplink": true
+      },
+      "assigngrp": "eth0",
+      "phyaddrs": {
+        "Ifname": "eth0"
+      },
+      "phylabel": "eth0"
+    },
+    {
+      "logicallabel": "eth1",
+      "ptype": 1,
+      "type": 1,
+      "usage": 1,
+      "usagePolicy": {
+        "freeUplink": true
+      },
+      "assigngrp": "eth1",
+      "phyaddrs": {
+        "Ifname": "eth1"
+      },
+      "phylabel": "eth1"
+    }
+  ],
+  "id": {
+    "uuid": "DEVICE_UUID",
+    "version": "4"
+  },
+  "configItems": [{
+    "key": "debug.enable.ssh",
+    "value": "SSH_KEY"
+  },
+    {
+      "key": "timer.port.testbetterinterval",
+      "value": "10"
+    }
+  ],
+  "datastores": [
+    {
+      "dType": 5,
+      "fqdn": "docker://docker.io",
+      "password": "",
+      "apiKey": "",
+      "id": "9ec0c1c7-7120-4685-9175-818a013f7061"
+    },
+    {
+      "dType": 1,
+      "fqdn": "http://download.cirros-cloud.net",
+      "password": "********",
+      "apiKey": "********",
+      "id": "9ec0c1c7-7120-4685-9175-818a013f7063"
+    }
+  ],
+  "apps": [
+    {
+      "uuidandversion": {
+        "uuid": "c2e4509a-630a-4e26-9963-b8795e2725b3",
+        "version": "5"
+      },
+      "fixedresources": {
+        "maxmem": 262144,
+        "vcpus": 1,
+        "bootloader": "/usr/bin/pygrub",
+        "memory": 262144,
+        "rootdev": "/dev/xvda1"
+      },
+      "interfaces": [
+        {
+          "name": "default",
+          "networkId": "6822e35f-c1b8-43ca-b344-0bbc0ece8cf9",
+          "acls": [
+            {
+              "matches": [
+                {
+                  "type": "host"
+                }
+              ],
+              "id": 1
+            },
+            {
+              "matches": [
+                {
+                  "type": "ip",
+                  "value": "0.0.0.0/0"
+                }
+              ],
+              "id": 2
+            },
+            {
+              "actions": [
+                {
+                  "portmap": true,
+                  "appPort": 22
+                }
+              ],
+              "matches": [
+                {
+                  "type": "protocol",
+                  "value": "tcp"
+                },
+                {
+                  "type": "lport",
+                  "value": "2223"
+                }
+              ],
+              "id": 3
+            }
+          ]
+        }
+      ],
+      "drives": [
+        {
+          "image": {
+            "dsId": "9ec0c1c7-7120-4685-9175-818a013f7063",
+            "uuidandversion": {
+              "uuid": "ebf2b86a-2936-43e5-9698-8216104d1fb5",
+              "version": "3"
+            },
+            "sha256": "a8dd75ecffd4cdd96072d60c2237b448e0c8b2bc94d57f10fdbc8c481d9005b8",
+            "siginfo": {},
+            "iformat": 3,
+            "name": "0.4.0/cirros-0.4.0-x86_64-disk.img"
+          }
+        }
+      ],
+      "activate": true,
+      "displayname": "cirros-testing"
+    }
+  ],
+  "systemAdapterList": [
+    {
+      "uplink": true,
+      "name": "eth0",
+      "networkUUID": "2e6038c1-ece6-4ffd-b95b-a7302c219d58",
+      "lowerLayerName": "eth0"
+    },
+    {
+      "uplink": true,
+      "name": "eth1",
+      "networkUUID": "2e6038c1-ece6-4ffd-b95b-a7302c219d59",
+      "lowerLayerName": "eth1"
+    }
+  ],
+  "networkInstances": [
+    {
+      "ip": {
+        "dhcpRange": {
+          "start": "10.1.0.2",
+          "end": "10.1.255.254"
+        },
+        "gateway": "10.1.0.1",
+        "subnet": "10.1.0.0/16",
+        "dns": [
+          "10.1.0.1"
+        ]
+      },
+      "uuidandversion": {
+        "uuid": "6822e35f-c1b8-43ca-b344-0bbc0ece8cf9"
+      },
+      "cfg": {},
+      "port": {
+        "name": "uplink"
+      },
+      "activate": true,
+      "displayname": "defaultLocal",
+      "ipType": 1,
+      "instType": 2
+    }
+  ],
+  "lispInfo": {
+    "LispMapServers": [
+      {
+        "NameOrIp": "zedcontrol.zededa.net",
+        "Credential": "zededa-lispers.net"
+      }
+    ],
+    "LispInstance": 1000,
+    "EID": "fd5b:8f21:c6b2:2c14:1d41:bd5f:bf40:d6c4",
+    "EIDHashLen": 120,
+    "ZedServers": [
+      {
+        "HostName": "zedcontrol",
+        "EID": [
+          "fd45:efca:3607:4c1d:eace:a947:3464:d21e"
+        ]
+      },
+      {
+        "HostName": "zedlake",
+        "EID": [
+          "fd45:efca:3607:4c1d:eace:a947:3464:d21e"
+        ]
+      },
+      {
+        "HostName": "zedbobo",
+        "EID": [
+          "fdd5:79bf:7261:d9df:aea1:c8d2:842d:b99b"
+        ]
+      },
+      {
+        "HostName": "hikey02",
+        "EID": [
+          "fdfd:ceef:cf85:7e40:6d4f:2181:ba06:e668"
+        ]
+      },
+      {
+        "HostName": "hikey04",
+        "EID": [
+          "fd12:df08:d686:602d:2145:f7cf:2382:1683"
+        ]
+      },
+      {
+        "HostName": "hikey05",
+        "EID": [
+          "fd81:abc5:7d7e:bcd7:40d9:df2c:be4b:600"
+        ]
+      }
+    ],
+    "EidAllocationPrefix": "/Q==",
+    "EidAllocationPrefixLen": 8
+  },
+  "manufacturer": "ZedVirtualDevice",
+  "productName": "ZedVirtual-4G"
+}
