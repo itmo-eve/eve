@@ -14,7 +14,7 @@ import (
 )
 
 var Test bool
-var Run func (command *cobra.Command, timeout time.Duration, args []string, env string) (rerr, cerr error, stdout, stderr bytes.Buffer)
+var Run func(command *cobra.Command, timeout time.Duration, args []string, env string) (rerr, cerr error, stdout, stderr bytes.Buffer)
 
 // Run shell command with arguments and enviroment variables
 func run(command *cobra.Command, timeout time.Duration, args []string, env string) (rerr error, cerr error, stdout bytes.Buffer, stderr bytes.Buffer) {
@@ -55,28 +55,28 @@ func run(command *cobra.Command, timeout time.Duration, args []string, env strin
 		}
 	}
 
-        if re != nil {
-                if exitError, ok := re.(*exec.ExitError); ok {
-                        waitStatus := exitError.Sys().(syscall.WaitStatus)
-                        _, err = fmt.Fprint(command.OutOrStderr(), serr.String())
-                        if err != nil {
-                                fmt.Fprint(command.OutOrStdout(), serr.String())
-                        }
+	if re != nil {
+		if exitError, ok := re.(*exec.ExitError); ok {
+			waitStatus := exitError.Sys().(syscall.WaitStatus)
+			_, err = fmt.Fprint(command.OutOrStderr(), serr.String())
+			if err != nil {
+				fmt.Fprint(command.OutOrStdout(), serr.String())
+			}
 			if !Test {
 				os.Exit(waitStatus.ExitStatus())
 			} else {
 				return re, ce, sout, serr
 			}
-                } else {
-                        _, err = fmt.Fprintf(command.OutOrStderr(),
+		} else {
+			_, err = fmt.Fprintf(command.OutOrStderr(),
 				"Execute error: %s\n", err.Error())
-                        if err != nil {
-                                fmt.Fprintf(command.OutOrStdout(),
+			if err != nil {
+				fmt.Fprintf(command.OutOrStdout(),
 					"Execute error: %s\n", err.Error())
-                        }
-                }
-        }
-        fmt.Fprint(command.OutOrStdout(), sout.String())
-	
+			}
+		}
+	}
+	fmt.Fprint(command.OutOrStdout(), sout.String())
+
 	return re, ce, sout, serr
 }
