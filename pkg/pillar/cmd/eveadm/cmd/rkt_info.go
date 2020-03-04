@@ -24,10 +24,10 @@ eveadm rkt info uuid
 		var envs string
 		if isImage {
 			rktctx.imageUUID = uuid
-			err, args, envs = rktctx.rktInfoImageToCmd()
+			args, envs, err = rktctx.rktInfoImageToCmd()
 		} else {
 			rktctx.containerUUID = uuid
-			err, args, envs = rktctx.rktInfoToCmd()
+			args, envs, err = rktctx.rktInfoToCmd()
 		}
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())

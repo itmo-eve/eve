@@ -22,7 +22,7 @@ eveadm xen stop uuid`,
 		}
 		xenctx.force = force
 		xenctx.containerUUID = arg
-		err, args, envs := xenctx.xenStopToCmd()
+		args, envs, err := xenctx.xenStopToCmd()
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())
 		}

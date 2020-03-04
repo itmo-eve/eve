@@ -20,9 +20,9 @@ eveadm rkt delete gc`,
 		}
 		var envs string
 		if isImage {
-			err, args, envs = rktctx.rktDeleteGCImageToCmd()
+			args, envs, err = rktctx.rktDeleteGCImageToCmd()
 		} else {
-			err, args, envs = rktctx.rktDeleteGCToCmd()
+			args, envs, err = rktctx.rktDeleteGCToCmd()
 		}
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())

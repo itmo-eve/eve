@@ -16,7 +16,7 @@ Run shell command with arguments in 'list' action on 'xen' mode. For example:
 eveadm xen list
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		err, args, envs := xenctx.xenListToCmd()
+		args, envs, err := xenctx.xenListToCmd()
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())
 		}

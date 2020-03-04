@@ -27,9 +27,9 @@ eveadm rkt list
 		rktctx.fields = fields
 		var envs string
 		if isImage {
-			err, args, envs = rktctx.rktListImageToCmd()
+			args, envs, err = rktctx.rktListImageToCmd()
 		} else {
-			err, args, envs = rktctx.rktListToCmd()
+			args, envs, err = rktctx.rktListToCmd()
 		}
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())

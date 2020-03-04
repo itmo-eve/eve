@@ -18,7 +18,7 @@ eveadm xen delete uuid`,
 	Run: func(cmd *cobra.Command, args []string) {
 		arg := args[0]
 		xenctx.containerUUID = arg
-		err, args, envs := xenctx.xenDeleteToCmd()
+		args, envs, err := xenctx.xenDeleteToCmd()
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())
 		}

@@ -18,7 +18,7 @@ eveadm rkt start uuid
 		arg := args[0]
 		if rktctx.stage1Type == "xen" {
 			rktctx.containerUUID = arg
-			err, args, envs := rktctx.rktStartToCmd()
+			args, envs, err := rktctx.rktStartToCmd()
 			if err != nil {
 				log.Fatalf("Error in obtain params in %s", cmd.Name())
 			}

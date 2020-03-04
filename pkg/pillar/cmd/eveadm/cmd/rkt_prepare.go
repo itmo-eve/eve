@@ -17,7 +17,7 @@ eveadm rkt prepare uuid
 	Run: func(cmd *cobra.Command, args []string) {
 		uuid := args[0]
 		rktctx.imageUUID = uuid
-		err, args, envs := rktctx.rktPrepareImageToCmd()
+		args, envs, err := rktctx.rktPrepareImageToCmd()
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())
 		}

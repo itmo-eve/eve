@@ -16,7 +16,7 @@ Run shell command with arguments in 'create' action on 'xen' mode. For example:
 eveadm xen create --xen-cfg-filename=dom.cfg
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		err, args, envs := xenctx.xenCreateToCmd()
+		args, envs, err := xenctx.xenCreateToCmd()
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())
 		}

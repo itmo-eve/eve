@@ -23,10 +23,10 @@ eveadm rkt delete uuid`,
 		var envs string
 		if isImage {
 			rktctx.imageUUID = arg
-			err, args, envs = rktctx.rktDeleteImageToCmd()
+			args, envs, err = rktctx.rktDeleteImageToCmd()
 		} else {
 			rktctx.containerUUID = arg
-			err, args, envs = rktctx.rktDeleteToCmd()
+			args, envs, err = rktctx.rktDeleteToCmd()
 		}
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())

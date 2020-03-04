@@ -23,11 +23,11 @@ eveadm rkt create image_uuid
 		}
 		var envs string
 		if isImage {
-			rktctx.imageUrl = arg
-			err, args, envs = rktctx.rktCreateImageToCmd()
+			rktctx.imageURL = arg
+			args, envs, err = rktctx.rktCreateImageToCmd()
 		} else {
 			rktctx.imageUUID = arg
-			err, args, envs = rktctx.rktCreateToCmd()
+			args, envs, err = rktctx.rktCreateToCmd()
 		}
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())

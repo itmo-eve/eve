@@ -13,11 +13,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//Test for testing purpose
 var Test bool
-var Run func(command *cobra.Command, timeout time.Duration, args []string, env string) (rerr, cerr error, stdout, stderr bytes.Buffer)
+
+//Run function for wrap exec
+var Run func(command *cobra.Command, timeout time.Duration, args []string, env string) (stdout, stderr bytes.Buffer, rerr, cerr error)
 
 // Run shell command with arguments and enviroment variables
-func run(command *cobra.Command, timeout time.Duration, args []string, env string) (rerr error, cerr error, stdout bytes.Buffer, stderr bytes.Buffer) {
+func run(command *cobra.Command, timeout time.Duration, args []string, env string) (stdout bytes.Buffer, stderr bytes.Buffer, rerr error, cerr error) {
 	var err error
 	var re error
 	var ce error
@@ -65,7 +68,7 @@ func run(command *cobra.Command, timeout time.Duration, args []string, env strin
 			if !Test {
 				os.Exit(waitStatus.ExitStatus())
 			} else {
-				return re, ce, sout, serr
+				return sout, serr, re, ce
 			}
 		} else {
 			_, err = fmt.Fprintf(command.OutOrStderr(),
@@ -78,5 +81,5 @@ func run(command *cobra.Command, timeout time.Duration, args []string, env strin
 	}
 	fmt.Fprint(command.OutOrStdout(), sout.String())
 
-	return re, ce, sout, serr
+	return sout, serr, re, ce
 }

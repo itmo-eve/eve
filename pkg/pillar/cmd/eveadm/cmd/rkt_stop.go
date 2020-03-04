@@ -20,7 +20,7 @@ eveadm rkt stop uuid
 			log.Fatalf("Error in get param force in %s", cmd.Name())
 		}
 		rktctx.force = force
-		err, args, envs := rktctx.rktStopToCmd()
+		args, envs, err := rktctx.rktStopToCmd()
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())
 		}

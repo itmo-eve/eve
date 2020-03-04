@@ -4,6 +4,7 @@ import (
 	"errors"
 )
 
+//XENContext have parameters for fire xen eveadm
 type XENContext struct {
 	containerUUID  string
 	xenCfgFilename string
@@ -14,15 +15,15 @@ type XENContext struct {
 
 var xenctx XENContext
 
-func (ctx XENContext) xenListToCmd() (err error, args []string, envs string) {
+func (ctx XENContext) xenListToCmd() (args []string, envs string, err error) {
 	args = []string{"xl", "list"}
 	envs = ""
 	err = nil
 	return
 }
-func (ctx XENContext) xenCreateToCmd() (err error, args []string, envs string) {
+func (ctx XENContext) xenCreateToCmd() (args []string, envs string, err error) {
 	if ctx.xenCfgFilename == "" {
-		return errors.New("No xenCfgFilename in args"), nil, ""
+		return nil, "", errors.New("no xenCfgFilename in args")
 	}
 	args = []string{"xl", "create", ctx.xenCfgFilename}
 	if ctx.runPaused {
@@ -31,9 +32,9 @@ func (ctx XENContext) xenCreateToCmd() (err error, args []string, envs string) {
 	err = nil
 	return
 }
-func (ctx XENContext) xenStopToCmd() (err error, args []string, envs string) {
+func (ctx XENContext) xenStopToCmd() (args []string, envs string, err error) {
 	if ctx.containerUUID == "" {
-		return errors.New("No container uuid in args"), nil, ""
+		return nil, "", errors.New("no container uuid in args")
 	}
 	args = []string{"xl", "shutdown"}
 	if ctx.force {
@@ -44,36 +45,36 @@ func (ctx XENContext) xenStopToCmd() (err error, args []string, envs string) {
 	err = nil
 	return
 }
-func (ctx XENContext) xenInfoToCmd() (err error, args []string, envs string) {
+func (ctx XENContext) xenInfoToCmd() (args []string, envs string, err error) {
 	if ctx.containerUUID == "" {
-		return errors.New("No container uuid in args"), nil, ""
+		return nil, "", errors.New("no container uuid in args")
 	}
 	args = []string{"xl", "list", "-l", ctx.containerUUID}
 	envs = ""
 	err = nil
 	return
 }
-func (ctx XENContext) xenInfoDomidToCmd() (err error, args []string, envs string) {
+func (ctx XENContext) xenInfoDomidToCmd() (args []string, envs string, err error) {
 	if ctx.containerName == "" {
-		return errors.New("No container name in args"), nil, ""
+		return nil, "", errors.New("no container name in args")
 	}
 	args = []string{"xl", "domid", ctx.containerName}
 	envs = ""
 	err = nil
 	return
 }
-func (ctx XENContext) xenDeleteToCmd() (err error, args []string, envs string) {
+func (ctx XENContext) xenDeleteToCmd() (args []string, envs string, err error) {
 	if ctx.containerUUID == "" {
-		return errors.New("No container uuid in args"), nil, ""
+		return nil, "", errors.New("no container uuid in args")
 	}
 	args = []string{"xl", "destroy", ctx.containerUUID}
 	envs = ""
 	err = nil
 	return
 }
-func (ctx XENContext) xenStartToCmd() (err error, args []string, envs string) {
+func (ctx XENContext) xenStartToCmd() (args []string, envs string, err error) {
 	if ctx.containerUUID == "" {
-		return errors.New("No container uuid in args"), nil, ""
+		return nil, "", errors.New("no container uuid in args")
 	}
 	args = []string{"xl", "unpause", ctx.containerUUID}
 	envs = ""

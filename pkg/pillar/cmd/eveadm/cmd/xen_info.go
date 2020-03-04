@@ -23,10 +23,10 @@ eveadm xen info --domname name
 		var envs string
 		if isDomid {
 			xenctx.containerName = arg
-			err, args, envs = xenctx.xenInfoDomidToCmd()
+			args, envs, err = xenctx.xenInfoDomidToCmd()
 		} else {
 			xenctx.containerUUID = arg
-			err, args, envs = xenctx.xenInfoToCmd()
+			args, envs, err = xenctx.xenInfoToCmd()
 		}
 		if err != nil {
 			log.Fatalf("Error in obtain params in %s", cmd.Name())

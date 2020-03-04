@@ -12,9 +12,15 @@ import (
 )
 
 var cfgFile string
+
+//Timeout of running command
 var Timeout time.Duration
 var timeout string
+
+//Verbose mode
 var Verbose bool
+
+//RootCmd is root of cobra
 var RootCmd *cobra.Command
 
 // rootCmd represents the base command when called without any subcommands
