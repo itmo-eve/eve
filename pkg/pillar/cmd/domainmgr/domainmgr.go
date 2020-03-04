@@ -2351,7 +2351,9 @@ func xlCreate(domainName string, xenCfgFilename string) (int, error) {
 	log.Infof("xl create done\n")
 
 	args = []string{
-		"domid",
+		"xen",
+		"info",
+		"--domname",
 		domainName,
 	}
 	stdoutStderr, err = wrap.Command(cmd, args...).CombinedOutput()
