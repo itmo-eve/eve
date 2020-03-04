@@ -80,6 +80,8 @@ func main() {
 		tpmmgr.Run(ps)
 	case "vaultmgr":
 		vaultmgr.Run(ps)
+	case "eveadm":
+		eveadm.Run(ps)
 	default:
 		fmt.Printf("Unknown package: %s\n", basename)
 	}
