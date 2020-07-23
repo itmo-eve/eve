@@ -630,6 +630,25 @@ func (client *Client) LKTaskPrepare(name, linuxkit string, domSettings *types.Do
 	return spec.CreateContainer(true)
 }
 
+//LKTaskGetAnnotations gets annotations saved in json
+func (client *Client) LKTaskGetAnnotations(name, linuxkit string) (map[string]string, error) {
+	config := "/containers/services/" + linuxkit + "/config.json"
+	f, err := os.Open("/hostfs" + config)
+	if err != nil {
+		return nil, fmt.Errorf("LKTaskGetAnnotations: can't open spec file %s %v", config, err)
+	}
+	defer f.Close()
+
+	spec, err := client.NewOciSpec(name)
+	if err != nil {
+		return nil, fmt.Errorf("LKTaskGetAnnotations: NewOciSpec failed with error %v", err)
+	}
+	if err = spec.Load(f); err != nil {
+		return nil, fmt.Errorf("LKTaskGetAnnotations: can't load spec file from %s %v", config, err)
+	}
+	return spec.Get().Annotations, nil
+}
+
 // CtrNewUserServicesCtx returns a new user service containerd context
 // and a done func to cancel the context after use.
 func (client *Client) CtrNewUserServicesCtx() (context.Context, context.CancelFunc) {

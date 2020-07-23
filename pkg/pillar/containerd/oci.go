@@ -169,6 +169,9 @@ func (s *ociSpec) UpdateFromDomain(dom types.DomainConfig) {
 		s.Linux.Resources.CPU.Period = &p
 		s.Linux.Resources.CPU.Quota = &q
 	}
+	if dom.EnableVnc && dom.VncPasswd != "" {
+		s.Annotations["VncPasswd"] = dom.VncPasswd
+	}
 }
 
 // UpdateFromVolume updates values in the OCI spec based on the location
