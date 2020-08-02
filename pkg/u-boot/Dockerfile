@@ -22,8 +22,12 @@ WORKDIR /u-boot
 # FIXME: we need to get to the bottom of this weird workaround on x86/Alpine
 RUN if [ "$(uname -m)" = x86_64 ]; then                                              \
        cp /etc/apk/repositories.upstream /etc/apk/repositories                     &&\
-       apk add --no-cache python3-dev=3.6.9-r2                                     &&\
+       apk add --no-cache python3-dev=3.6.9-r3                                     &&\
        sed -ie 's#CONFIG_IS_ENABLED(X86_64)#1#' ./arch/x86/include/asm/byteorder.h  ;\
+    fi
+COPY patches /tmp/patches
+RUN if [ "$(uname -m)" = aarch64 ]; then\
+       for p in /tmp/patches/patches-"${VERSION}"/*.patch ; do patch -p1 < "$p" || exit 1 ; done;\
     fi
 RUN eval make \$TARGET_"$(uname -m)"
 RUN make -j "$(getconf _NPROCESSORS_ONLN)"
