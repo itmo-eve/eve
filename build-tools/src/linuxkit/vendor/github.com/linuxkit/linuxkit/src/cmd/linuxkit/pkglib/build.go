@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/linuxkit/linuxkit/src/cmd/linuxkit/version"
 	log "github.com/sirupsen/logrus"
@@ -18,6 +17,7 @@ type buildOpts struct {
 	force     bool
 	push      bool
 	release   string
+	arch      string
 }
 
 // BuildOpt allows callers to specify options to Build
@@ -55,6 +55,14 @@ func WithRelease(r string) BuildOpt {
 	}
 }
 
+// WithArch sets custom arch to pkg
+func WithArch(arch string) BuildOpt{
+	return func(bo *buildOpts) error{
+		bo.arch = arch
+		return nil
+	}
+}
+
 // Build builds the package
 func (p Pkg) Build(bos ...BuildOpt) error {
 	var bo buildOpts
@@ -67,13 +75,9 @@ func (p Pkg) Build(bos ...BuildOpt) error {
 	if _, ok := os.LookupEnv("DOCKER_CONTENT_TRUST_REPOSITORY_PASSPHRASE"); !ok && p.trust && bo.push {
 		return fmt.Errorf("Pushing with trust enabled requires $DOCKER_CONTENT_TRUST_REPOSITORY_PASSPHRASE to be set")
 	}
-
-	arch := runtime.GOARCH
-
-	if !p.archSupported(arch) {
-		fmt.Printf("Arch %s not supported by this package, skipping build.\n", arch)
-		return nil
-	}
+	
+	arch := bo.arch
+	
 	if err := p.cleanForBuild(); err != nil {
 		return err
 	}

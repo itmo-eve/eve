@@ -419,7 +419,14 @@ endif
 	@$(PARSE_PKGS) $< > $@
 
 eve-%: pkg/%/Dockerfile build-tools $(RESCAN_DEPS)
+ifeq ($(LINUXKIT_PKG_TARGET),build)
+	@$(LINUXKIT) pkg build --arch=$(ZARCH) $(LINUXKIT_OPTS) pkg/$*
+else
+	ifeq ($(HOSTARCH),$(ZARCH))
 	@$(LINUXKIT) pkg $(LINUXKIT_PKG_TARGET) $(LINUXKIT_OPTS) pkg/$*
+	endif
+endif
+
 
 images/rootfs-%.yml.in: images/rootfs.yml.in FORCE
 	@if [ -e $@.patch ]; then patch -p0 -o $@.sed < $@.patch ;else cp $< $@.sed ;fi

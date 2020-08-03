@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/linuxkit/linuxkit/src/cmd/linuxkit/pkglib"
 )
@@ -20,6 +21,7 @@ func pkgBuild(args []string) {
 	}
 
 	force := flags.Bool("force", false, "Force rebuild")
+	arch := flags.String("arch", runtime.GOARCH, "Set arch another than GOARCH")
 
 	p, err := pkglib.NewFromCLI(flags, args...)
 	if err != nil {
@@ -33,6 +35,7 @@ func pkgBuild(args []string) {
 	if *force {
 		opts = append(opts, pkglib.WithBuildForce())
 	}
+	opts = append(opts, pkglib.WithArch(*arch))
 	if err := p.Build(opts...); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
