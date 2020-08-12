@@ -1464,19 +1464,12 @@ func configToStatus(ctx *domainContext, config types.DomainConfig,
 			// map from i=1 to xvdb, 2 to xvdc etc
 			// For container instances xvda will be used for container disk
 			// So for other disks we are starting from xvdb
-			// Currently, we are not supporting multiple container disks inside a pod
 			xv = "xvd" + string(int('b')+i)
 		} else {
 			// map from i=1 to xvda, 2 to xvdb etc
 			xv = "xvd" + string(int('a')+i)
 		}
 		ds.Vdev = xv
-	}
-	if numOfContainerDisks > 1 {
-		err := `Bundle contains more than one container disk, running multiple containers
-				inside a pod is not supported now.`
-		log.Errorf(err)
-		return fmt.Errorf(err)
 	}
 	// XXX could defer to Activate
 	if config.IsCipher || config.CloudInitUserData != nil {
