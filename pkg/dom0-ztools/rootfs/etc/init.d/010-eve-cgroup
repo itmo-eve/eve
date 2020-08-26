@@ -111,3 +111,11 @@ for srv in $EVESRVICES; do
         /bin/echo "0-$eve_cgroup_cpus_limit" > /sys/fs/cgroup/cpuset/eve/services/"${srv}"/cpuset.cpus
     fi
 done
+
+#Creating cgroup for eve-user-apps
+mkdir -p /sys/fs/cgroup/memory/eve-user-apps
+total_memory_bytes=$(free -b | awk '/^Mem:/{print $2}')
+eve_cgroup_memory_limit_bytes=$(cat /sys/fs/cgroup/memory/eve/services/memory.limit_in_bytes)
+eve_cgroup_memory_soft_limit_bytes=$(cat /sys/fs/cgroup/memory/eve/services/memory.soft_limit_in_bytes)
+/bin/echo $((total_memory_bytes-eve_cgroup_memory_soft_limit_bytes)) > /sys/fs/cgroup/memory/eve-user-apps/memory.limit_in_bytes
+/bin/echo $((total_memory_bytes-eve_cgroup_memory_limit_bytes)) > /sys/fs/cgroup/memory/eve-user-apps/memory.soft_limit_in_bytes
