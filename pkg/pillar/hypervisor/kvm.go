@@ -292,6 +292,13 @@ const qemuSerialTemplate = `
   chardev = "charserial-usr{{.ID}}"
 `
 
+const qemuUsbHostTemplate = `
+[device]
+  driver = "usb-host"
+  hostbus = "{{.UsbBus}}"
+  hostport = "{{.UsbPort}}"
+`
+
 const kvmStateDir = "/var/run/hypervisor/kvm/"
 const sysfsPciDevices = "/sys/bus/pci/devices/"
 const sysfsVfioPciBind = "/sys/bus/pci/drivers/vfio-pci/bind"
@@ -471,6 +478,8 @@ func (ctx kvmContext) CreateDomConfig(domainName string, config types.DomainConf
 
 	// Gather all PCI assignments into a single line
 	var pciAssignments []typeAndPCI
+	// Gather all USB assignments into a single line
+	var usbAssignments []string
 	// Gather all serial assignments into a single line
 	var serialAssignments []string
 
@@ -499,6 +508,10 @@ func (ctx kvmContext) CreateDomConfig(domainName string, config types.DomainConf
 			if ib.Serial != "" {
 				log.Infof("Adding serial <%s>\n", ib.Serial)
 				serialAssignments = addNoDuplicate(serialAssignments, ib.Serial)
+			}
+			if ib.UsbAddr != "" {
+				log.Infof("Adding USB host device <%s>\n", ib.UsbAddr)
+				usbAssignments = addNoDuplicate(usbAssignments, ib.UsbAddr)
 			}
 		}
 	}
@@ -539,6 +552,24 @@ func (ctx kvmContext) CreateDomConfig(domainName string, config types.DomainConf
 			}
 		}
 	}
+	if len(usbAssignments) != 0 {
+		usbHostContext := struct {
+			UsbBus  string
+			UsbPort string
+			// Ports are dot-separated
+		}{UsbBus: "", UsbPort: ""}
+
+		t, _ = template.New("qemuUsbHost").Parse(qemuUsbHostTemplate)
+		for _, usbaddr := range usbAssignments {
+			bus, port := usbBusPort(usbaddr)
+			usbHostContext.UsbBus = bus
+			usbHostContext.UsbPort = port
+			if err := t.Execute(file, usbHostContext); err != nil {
+				return logError("can't write USB host device assignment to config file %s (%v)", file.Name(), err)
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -728,6 +759,11 @@ func (ctx kvmContext) PCIRelease(long string) error {
 	}
 
 	return nil
+}
+
+func usbBusPort(USBAddr string) (string, string) {
+	ids := strings.SplitAfterN(USBAddr, ":", 2)
+	return ids[0], ids[1]
 }
 
 func getQmpExecutorSocket(domainName string) string {
