@@ -100,7 +100,7 @@ func doUpdateContentTree(ctx *volumemgrContext, status *types.ContentTreeStatus)
 					Sha256:      status.ContentSha256,
 					Size:        status.MaxDownloadSize,
 					State:       types.INITIAL,
-					BlobType:    types.BlobUnknown,
+					BlobType:    types.BlobUnknown, // our initial type is unknown, but it will be set by the Content-Type http header
 				}
 				log.Infof("doUpdateContentTree: publishing new root BlobStatus (%s) for content tree (%s)",
 					status.ContentSha256, status.ContentID)
@@ -151,7 +151,7 @@ func doUpdateContentTree(ctx *volumemgrContext, status *types.ContentTreeStatus)
 			if blob.State <= types.DOWNLOADING {
 				// any state less than downloaded, we ask for download, so that we have the refcount;
 				// downloadBlob() is smart enough to look for existing references
-				log.Infof("doUpdateContentTree: blob sha %s download state %v less than DOWNLOADED", blob.Sha256, blob.State)
+				log.Debugf("doUpdateContentTree: blob sha %s download state %v less than DOWNLOADED", blob.Sha256, blob.State)
 				if downloadBlob(ctx, status.ObjType, sv, blob) {
 					publishBlobStatus(ctx, blob)
 					changed = true
@@ -167,24 +167,11 @@ func doUpdateContentTree(ctx *volumemgrContext, status *types.ContentTreeStatus)
 			}
 			if blob.State < types.VERIFIED {
 				leftToProcess = true
-				log.Errorf("doUpdateContentTree: left to process due to state '%s' for content blob %s",
+				log.Debugf("doUpdateContentTree: left to process due to state '%s' for content blob %s",
 					blob.State, blob.Sha256)
 			} else {
-				log.Infof("doUpdateContentTree: blob sha %s download state VERIFIED", blob.Sha256)
+				log.Debugf("doUpdateContentTree: blob sha %s download state VERIFIED", blob.Sha256)
 				// if verified, check for any children and start them off
-				// resolve any unknown types and get manifests of index, or children of manifest
-				blobType, err := resolveBlobType(ctx, blob)
-				if blobType != blob.BlobType || err != nil {
-					blob.BlobType = blobType
-					publishBlobStatus(ctx, blob)
-					changed = true
-				}
-				if err != nil {
-					log.Infof("doUpdateContentTree(%s): error resolving blob type: %v", blob.Sha256, err)
-					blob.SetError(err.Error(), time.Now())
-					publishBlobStatus(ctx, blob)
-					changed = true
-				}
 				blobChildren := blobsNotInList(getBlobChildren(ctx, sv, blob), status.Blobs)
 				if len(blobChildren) > 0 {
 					log.Infof("doUpdateContentTree: adding %d children", len(blobChildren))
@@ -472,7 +459,7 @@ func updateStatus(ctx *volumemgrContext, sha string) {
 			var hasSha bool
 			for _, blobSha := range status.Blobs {
 				if blobSha == sha {
-					log.Infof("Found blob %s on ContentTreeStatus %s",
+					log.Debugf("Found blob %s on ContentTreeStatus %s",
 						sha, status.Key())
 					hasSha = true
 				}
@@ -485,7 +472,7 @@ func updateStatus(ctx *volumemgrContext, sha string) {
 					publishContentTreeStatus(ctx, &status)
 				}
 				// Volume status referring to this content UUID needs to get updated
-				log.Infof("updateStatus(%s) updating volume status from content ID %v",
+				log.Debugf("updateStatus(%s) updating volume status from content ID %v",
 					status.Key(), status.ContentID)
 				updateVolumeStatusFromContentID(ctx,
 					status.ContentID)
@@ -555,14 +542,14 @@ func updateVolumeStatus(ctx *volumemgrContext, volumeID uuid.UUID) {
 // Find all the VolumeStatus which refer to this content uuid
 func updateVolumeStatusFromContentID(ctx *volumemgrContext, contentID uuid.UUID) {
 
-	log.Infof("updateVolumeStatusFromContentID for %s", contentID)
+	log.Debugf("updateVolumeStatusFromContentID for %s", contentID)
 	found := false
 	pub := ctx.pubVolumeStatus
 	items := pub.GetAll()
 	for _, st := range items {
 		status := st.(types.VolumeStatus)
 		if status.ContentID == contentID {
-			log.Infof("Found VolumeStatus %s: name %s",
+			log.Debugf("Found VolumeStatus %s: name %s",
 				status.Key(), status.DisplayName)
 			found = true
 			changed, _ := doUpdateVol(ctx, &status)

@@ -866,6 +866,75 @@ func (status DeviceNetworkStatus) LogKey() string {
 	return string(base.DeviceNetworkStatusLogType) + "-" + status.Key()
 }
 
+// Equal compares two DeviceNetworkStatus but skips things the test status/results aspects.
+// We compare the Ports in array order.
+func (status DeviceNetworkStatus) Equal(status2 DeviceNetworkStatus) bool {
+
+	if len(status.Ports) != len(status2.Ports) {
+		return false
+	}
+	for i, p1 := range status.Ports {
+		p2 := status2.Ports[i]
+		if p1.IfName != p2.IfName ||
+			p1.Phylabel != p2.Phylabel ||
+			p1.Logicallabel != p2.Logicallabel ||
+			p1.Alias != p2.Alias ||
+			p1.IsMgmt != p2.IsMgmt ||
+			p1.Free != p2.Free {
+			return false
+		}
+		if p1.Dhcp != p2.Dhcp ||
+			!EqualSubnet(p1.Subnet, p2.Subnet) ||
+			!p1.NtpServer.Equal(p2.NtpServer) ||
+			p1.DomainName != p2.DomainName {
+			return false
+		}
+		if len(p1.DNSServers) != len(p2.DNSServers) {
+			return false
+		}
+		for i := range p1.DNSServers {
+			if !p1.DNSServers[i].Equal(p2.DNSServers[i]) {
+				return false
+			}
+		}
+		if len(p1.AddrInfoList) != len(p2.AddrInfoList) {
+			return false
+		}
+		for i := range p1.AddrInfoList {
+			if !p1.AddrInfoList[i].Addr.Equal(p2.AddrInfoList[i].Addr) {
+				return false
+			}
+		}
+		if p1.Up != p2.Up ||
+			p1.MacAddr != p2.MacAddr {
+			return false
+		}
+		if len(p1.DefaultRouters) != len(p2.DefaultRouters) {
+			return false
+		}
+		for i := range p1.DefaultRouters {
+			if !p1.DefaultRouters[i].Equal(p2.DefaultRouters[i]) {
+				return false
+			}
+		}
+
+		if !reflect.DeepEqual(p1.ProxyConfig, p2.ProxyConfig) {
+			return false
+		}
+	}
+	return true
+}
+
+// EqualSubnet compares two subnets; silently assumes contigious masks
+func EqualSubnet(subnet1, subnet2 net.IPNet) bool {
+	if !subnet1.IP.Equal(subnet2.IP) {
+		return false
+	}
+	len1, _ := subnet1.Mask.Size()
+	len2, _ := subnet2.Mask.Size()
+	return len1 == len2
+}
+
 // GetPortByIfName - Get Port Status for port with given Ifname
 func (status *DeviceNetworkStatus) GetPortByIfName(
 	ifname string) *NetworkPortStatus {
@@ -1433,34 +1502,6 @@ type NetworkInstanceProbeStatus struct {
 	PInfo             map[string]ProbeInfo // per physical port eth0, eth1 probing state
 }
 
-type MapServer struct {
-	ServiceType MapServerType
-	NameOrIp    string
-	Credential  string
-}
-
-type LispConfig struct {
-	MapServers    []MapServer
-	IID           uint32
-	Allocate      bool
-	ExportPrivate bool
-	EidPrefix     net.IP
-	EidPrefixLen  uint32
-
-	Experimental bool
-}
-
-type NetworkInstanceLispConfig struct {
-	MapServers    []MapServer
-	IID           uint32
-	Allocate      bool
-	ExportPrivate bool
-	EidPrefix     net.IP
-	EidPrefixLen  uint32
-
-	Experimental bool
-}
-
 type DhcpType uint8
 
 const (
@@ -1641,7 +1682,6 @@ type NetworkInstanceMetrics struct {
 	NetworkMetrics NetworkMetrics
 	ProbeMetrics   ProbeMetrics
 	VpnMetrics     *VpnMetrics
-	LispMetrics    *LispMetrics
 }
 
 // ProbeMetrics - NI probe metrics
@@ -1754,10 +1794,9 @@ type NetworkInstanceConfig struct {
 	DhcpRange       IpRange
 	DnsNameToIPList []DnsNameToIP // Used for DNS and ACL ipset
 
-	HasEncap bool // Lisp/Vpn, for adjusting pMTU
-	// For other network services - Proxy / Lisp /StrongSwan etc..
+	HasEncap bool // Vpn, for adjusting pMTU
+	// For other network services - Proxy / StrongSwan etc..
 	OpaqueConfig string
-	LispConfig   NetworkInstanceLispConfig
 }
 
 func (config *NetworkInstanceConfig) Key() string {
@@ -1798,11 +1837,7 @@ type NetworkInstanceStatus struct {
 	NetworkInstanceInfo
 
 	OpaqueStatus string
-	LispStatus   NetworkInstanceLispConfig
-
-	VpnStatus      *VpnStatus
-	LispInfoStatus *LispInfoStatus
-	LispMetrics    *LispMetrics
+	VpnStatus    *VpnStatus
 
 	NetworkInstanceProbeStatus
 }
@@ -2045,81 +2080,6 @@ type VpnTunnelConfig struct {
 	Metric       string
 	LocalIpAddr  string
 	RemoteIpAddr string
-}
-
-type LispRlocState struct {
-	Rloc      net.IP
-	Reachable bool
-}
-
-type LispMapCacheEntry struct {
-	EID   net.IP
-	Rlocs []LispRlocState
-}
-
-type LispDatabaseMap struct {
-	IID             uint64
-	MapCacheEntries []LispMapCacheEntry
-}
-
-type LispDecapKey struct {
-	Rloc     net.IP
-	Port     uint64
-	KeyCount uint64
-}
-
-type LispInfoStatus struct {
-	ItrCryptoPort uint64
-	EtrNatPort    uint64
-	Interfaces    []string
-	DatabaseMaps  []LispDatabaseMap
-	DecapKeys     []LispDecapKey
-}
-
-type LispPktStat struct {
-	Pkts  uint64
-	Bytes uint64
-}
-
-type LispRlocStatistics struct {
-	Rloc                   net.IP
-	Stats                  LispPktStat
-	SecondsSinceLastPacket uint64
-}
-
-type EidStatistics struct {
-	IID       uint64
-	Eid       net.IP
-	RlocStats []LispRlocStatistics
-}
-
-type EidMap struct {
-	IID  uint64
-	Eids []net.IP
-}
-
-type LispMetrics struct {
-	// Encap Statistics
-	EidMaps            []EidMap
-	EidStats           []EidStatistics
-	ItrPacketSendError LispPktStat
-	InvalidEidError    LispPktStat
-
-	// Decap Statistics
-	NoDecryptKey       LispPktStat
-	OuterHeaderError   LispPktStat
-	BadInnerVersion    LispPktStat
-	GoodPackets        LispPktStat
-	ICVError           LispPktStat
-	LispHeaderError    LispPktStat
-	CheckSumError      LispPktStat
-	DecapReInjectError LispPktStat
-	DecryptError       LispPktStat
-}
-
-type LispDataplaneConfig struct {
-	// If true, we run legacy lispers.net data plane.
-	Legacy bool
 }
 
 type VpnState uint8

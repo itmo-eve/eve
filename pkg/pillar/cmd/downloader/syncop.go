@@ -198,7 +198,8 @@ func handleSyncOp(ctx *downloaderContext, key string,
 			ctx:    ctx,
 			status: status,
 		}
-		err = download(ctx, trType, st, syncOp, serverURL, auth,
+		downloadStartTime := time.Now()
+		contentType, err := download(ctx, trType, st, syncOp, serverURL, auth,
 			dsCtx.Dpath, dsCtx.Region,
 			config.Size, ifname, ipSrc, remoteName, locFilename)
 		if err != nil {
@@ -214,9 +215,11 @@ func handleSyncOp(ctx *downloaderContext, key string,
 		} else {
 			size = info.Size()
 		}
+		downloadTime := int64(time.Since(downloadStartTime) / time.Millisecond)
 		status.Size = uint64(size)
-		zedcloud.ZedCloudSuccess(ifname,
-			metricsUrl, 1024, size)
+		status.ContentType = contentType
+		zedcloud.ZedCloudSuccess(log, ifname,
+			metricsUrl, 1024, size, downloadTime)
 		handleSyncOpResponse(ctx, config, status,
 			locFilename, key, "")
 		return
@@ -315,7 +318,7 @@ func constructDatastoreContext(ctx *downloaderContext, configName string, NameIs
 
 func sourceFailureError(ip, ifname, url string, err error) {
 	log.Errorf("Source IP %s failed: %s", ip, err)
-	zedcloud.ZedCloudFailure(ifname, url, 1024, 0, false)
+	zedcloud.ZedCloudFailure(log, ifname, url, 1024, 0, false)
 }
 
 func getDatastoreCredential(ctx *downloaderContext,

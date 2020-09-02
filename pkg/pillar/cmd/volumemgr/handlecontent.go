@@ -121,30 +121,30 @@ func unpublishContentTreeStatus(ctx *volumemgrContext, status *types.ContentTree
 func lookupContentTreeStatus(ctx *volumemgrContext,
 	key, objType string) *types.ContentTreeStatus {
 
-	log.Infof("lookupContentTreeStatus(%s/%s)", key, objType)
+	log.Debugf("lookupContentTreeStatus(%s/%s)", key, objType)
 	pub := ctx.publication(types.ContentTreeStatus{}, objType)
 	c, _ := pub.Get(key)
 	if c == nil {
-		log.Infof("lookupContentTreeStatus(%s/%s) not found", key, objType)
+		log.Debugf("lookupContentTreeStatus(%s/%s) not found", key, objType)
 		return nil
 	}
 	status := c.(types.ContentTreeStatus)
-	log.Infof("lookupContentTreeStatus(%s/%s) Done", key, objType)
+	log.Debugf("lookupContentTreeStatus(%s/%s) Done", key, objType)
 	return &status
 }
 
 func lookupContentTreeConfig(ctx *volumemgrContext,
 	key, objType string) *types.ContentTreeConfig {
 
-	log.Infof("lookupContentTreeConfig(%s/%s)", key, objType)
+	log.Debugf("lookupContentTreeConfig(%s/%s)", key, objType)
 	sub := ctx.subscription(types.ContentTreeConfig{}, objType)
 	c, _ := sub.Get(key)
 	if c == nil {
-		log.Infof("lookupContentTreeConfig(%s/%s) not found", key, objType)
+		log.Debugf("lookupContentTreeConfig(%s/%s) not found", key, objType)
 		return nil
 	}
 	config := c.(types.ContentTreeConfig)
-	log.Infof("lookupContentTreeConfig(%s/%s) Done", key, objType)
+	log.Debugf("lookupContentTreeConfig(%s/%s) Done", key, objType)
 	return &config
 }
 
@@ -180,8 +180,15 @@ func createContentTreeStatus(ctx *volumemgrContext, config types.ContentTreeConf
 				CertificateChain: config.CertificateChain,
 			}
 			if lookupOrCreateBlobStatus(ctx, sv, config.ContentSha256) == nil {
+				// the blobType is binary unless we are dealing with OCI
+				// in reality, this is not determined by the *format* but by the source,
+				// i.e. an OCI registry may have other formats, no matter what the
+				// image format is. This will do for now, though.
 				blobType := types.BlobBinary
 				if config.Format == zconfig.Format_CONTAINER {
+					// when first creating the root, the type is unknown,
+					// but will be updated from the mediatype passed by the
+					// Content-Type http header
 					blobType = types.BlobUnknown
 				}
 				rootBlob := &types.BlobStatus{

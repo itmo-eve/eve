@@ -15,11 +15,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf8"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
-	"github.com/google/go-cmp/cmp"
 	"github.com/lf-edge/eve/api/go/logs"
 	"github.com/lf-edge/eve/pkg/pillar/agentlog"
 	"github.com/lf-edge/eve/pkg/pillar/base"
@@ -144,6 +142,7 @@ type zedcloudLogs struct {
 type inputLogMetrics struct {
 	totalDeviceLogInput uint64
 	totalAppLogInput    uint64
+	deviceLogInput      map[string]uint64 // map from source
 }
 
 // Run is an entry point into running logmanager
@@ -181,7 +180,7 @@ func Run(ps *pubsub.PubSub) int {
 	stillRunning := time.NewTicker(25 * time.Second)
 	ps.StillRunning(agentName, warningTime, errorTime)
 
-	cms := zedcloud.GetCloudMetrics() // Need type of data
+	cms := zedcloud.GetCloudMetrics(log) // Need type of data
 	pub, err := ps.NewPublication(
 		pubsub.PublicationOptions{
 			AgentName: agentName,
@@ -191,7 +190,8 @@ func Run(ps *pubsub.PubSub) int {
 		log.Fatal(err)
 	}
 
-	var inputMetrics inputLogMetrics
+	inputMetrics := inputLogMetrics{deviceLogInput: make(map[string]uint64)}
+
 	metricsPub, err := ps.NewPublication(
 		pubsub.PublicationOptions{
 			AgentName: agentName,
@@ -317,7 +317,7 @@ func Run(ps *pubsub.PubSub) int {
 		time.Duration(max))
 
 	currentPartition := zboot.GetCurrentPartition()
-	loggerChan := make(chan logEntry)
+	loggerChan := make(chan logEntry, 100)
 	ctx := loggerContext{
 		logChan:      loggerChan,
 		image:        currentPartition,
@@ -345,7 +345,7 @@ func Run(ps *pubsub.PubSub) int {
 		case <-publishTimer.C:
 			start := time.Now()
 			log.Debugln("publishTimer at", time.Now())
-			err := pub.Publish("global", zedcloud.GetCloudMetrics())
+			err := pub.Publish("global", zedcloud.GetCloudMetrics(log))
 			if err != nil {
 				log.Errorln(err)
 			}
@@ -448,6 +448,12 @@ func parseAndSendSyslogEntries(ctx *loggerContext) {
 			ctx.inputMetrics.totalAppLogInput++
 		} else {
 			ctx.inputMetrics.totalDeviceLogInput++
+			c, ok := ctx.inputMetrics.deviceLogInput[logSource]
+			if !ok {
+				c = 0
+			}
+			c++
+			ctx.inputMetrics.deviceLogInput[logSource] = c
 		}
 	}
 }
@@ -462,7 +468,8 @@ func handleDNSModify(ctxArg interface{}, key string, statusArg interface{}) {
 		return
 	}
 	log.Infof("handleDNSModify for %s", key)
-	if cmp.Equal(deviceNetworkStatus, status) {
+	// Ignore test status and timestamps
+	if deviceNetworkStatus.Equal(status) {
 		log.Infof("handleDNSModify no change")
 		return
 	}
@@ -669,6 +676,10 @@ func processEvents(image string, logChan <-chan logEntry,
 func publishLogMetrics(ctx *logmanagerContext, outMetrics *types.LogMetrics) {
 	outMetrics.TotalDeviceLogInput = ctx.inputMetrics.totalDeviceLogInput
 	outMetrics.TotalAppLogInput = ctx.inputMetrics.totalAppLogInput
+	outMetrics.DeviceLogInput = make(map[string]uint64)
+	for s, c := range ctx.inputMetrics.deviceLogInput {
+		outMetrics.DeviceLogInput[s] = c
+	}
 	ctx.metricsPub.Publish("global", *outMetrics)
 }
 
@@ -738,13 +749,7 @@ func handleAppLogEvent(event logEntry, appLogs *logs.AppInstanceLogBundle) bool 
 	}
 
 	logDetails := &logs.LogEntry{}
-	// XXX Is this still required. rsyslogd is now configured to do the same
-	logDetails.Content = strings.Map(func(r rune) rune {
-		if r == utf8.RuneError {
-			return -1
-		}
-		return r
-	}, event.content)
+	logDetails.Content = event.content
 	logDetails.Severity = event.severity
 	logDetails.Timestamp, _ = ptypes.TimestampProto(event.timestamp)
 	logDetails.Source = event.source
@@ -778,12 +783,7 @@ func handleLogEvent(event logEntry, reportLogs *logs.LogBundle) bool {
 	}
 
 	logDetails := &logs.LogEntry{}
-	logDetails.Content = strings.Map(func(r rune) rune {
-		if r == utf8.RuneError {
-			return -1
-		}
-		return r
-	}, event.content)
+	logDetails.Content = event.content
 	logDetails.Severity = event.severity
 	logDetails.Timestamp, _ = ptypes.TimestampProto(event.timestamp)
 	logDetails.Source = event.source

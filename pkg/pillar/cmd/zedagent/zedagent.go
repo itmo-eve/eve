@@ -761,6 +761,7 @@ func Run(ps *pubsub.PubSub) int {
 		log.Fatal(err)
 	}
 	zedagentCtx.subLogMetrics = subLogMetrics
+	subLogMetrics.Activate()
 
 	//initialize cipher processing block
 	cipherModuleInitialize(&zedagentCtx, ps)
@@ -876,7 +877,7 @@ func Run(ps *pubsub.PubSub) int {
 		log.Fatal(err)
 	}
 	// Subscribe to cloud metrics from different agents
-	cms := zedcloud.GetCloudMetrics()
+	cms := zedcloud.GetCloudMetrics(log)
 	subClientMetrics, err := ps.NewSubscription(pubsub.SubscriptionOptions{
 		AgentName: "zedclient",
 		TopicImpl: cms,
@@ -986,6 +987,9 @@ func Run(ps *pubsub.PubSub) int {
 
 		case change := <-subBaseOsStatus.MsgChan():
 			subBaseOsStatus.ProcessChange(change)
+
+		case change := <-subLogMetrics.MsgChan():
+			subLogMetrics.ProcessChange(change)
 
 		case change := <-subBlobStatus.MsgChan():
 			subBlobStatus.ProcessChange(change)
@@ -1262,7 +1266,7 @@ func handleDNSModify(ctxArg interface{}, key string, statusArg interface{}) {
 		return
 	}
 	log.Infof("handleDNSModify for %s", key)
-	// XXX empty is equal
+	// Since we report the TestResults we compare the whole struct
 	if cmp.Equal(*deviceNetworkStatus, status) {
 		log.Infof("handleDNSModify no change")
 		ctx.DNSinitialized = true

@@ -131,6 +131,7 @@ func Run(ps *pubsub.PubSub) int {
 			log.Fatal(err)
 		}
 	}
+	dnsmasqInitDirs()
 
 	pubUuidToNum, err := ps.NewPublication(pubsub.PublicationOptions{
 		AgentName:  agentName,
@@ -683,7 +684,7 @@ func lookupAppNetworkStatus(ctx *zedrouterContext, key string) *types.AppNetwork
 	pub := ctx.pubAppNetworkStatus
 	st, _ := pub.Get(key)
 	if st == nil {
-		log.Infof("lookupAppNetworkStatus(%s) not found\n", key)
+		log.Debugf("lookupAppNetworkStatus(%s) not found\n", key)
 		return nil
 	}
 	status := st.(types.AppNetworkStatus)
@@ -698,7 +699,7 @@ func lookupAppNetworkConfig(ctx *zedrouterContext, key string) *types.AppNetwork
 		sub = ctx.subAppNetworkConfigAg
 		c, _ = sub.Get(key)
 		if c == nil {
-			log.Infof("lookupAppNetworkConfig(%s) not found\n", key)
+			log.Debugf("lookupAppNetworkConfig(%s) not found\n", key)
 			return nil
 		}
 	}
@@ -1137,6 +1138,8 @@ func getUlAddrs(ctx *zedrouterContext,
 		// Assumption is that the config specifies a gateway/router
 		// in the same subnet as the static address.
 		appIPAddr = status.AppIPAddr.String()
+		recordIPAssignment(ctx, netInstStatus, status.AppIPAddr,
+			status.Mac)
 	} else if status.Mac != "" {
 		// XXX or change type of VifInfo.Mac to avoid parsing?
 		var mac net.HardwareAddr
@@ -1631,7 +1634,8 @@ func handleDNSModify(ctxArg interface{}, key string, statusArg interface{}) {
 		return
 	}
 	log.Infof("handleDNSModify for %s\n", key)
-	if cmp.Equal(ctx.deviceNetworkStatus, status) {
+	// Ignore test status and timestamps
+	if ctx.deviceNetworkStatus.Equal(status) {
 		log.Infof("handleDNSModify no change\n")
 		return
 	}

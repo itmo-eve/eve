@@ -298,12 +298,20 @@ func publishMetrics(ctx *zedagentContext, iteration int) {
 		deviceLogMetric.NumAppEventErrors = logMetrics.NumAppEventErrors
 		deviceLogMetric.NumDeviceBundleProtoBytesSent = logMetrics.NumDeviceBundleProtoBytesSent
 		deviceLogMetric.NumAppBundleProtoBytesSent = logMetrics.NumAppBundleProtoBytesSent
+		deviceLogMetric.InputSources = make(map[string]uint64)
+		for source, val := range logMetrics.DeviceLogInput {
+			deviceLogMetric.InputSources[source] = val
+		}
 		ReportDeviceMetric.Log = deviceLogMetric
 	}
 	log.Debugln("log metrics: ", ReportDeviceMetric.Log)
 
 	// Collect zedcloud metrics from ourselves and other agents
-	cms := zedcloud.GetCloudMetrics()
+	cms := types.MetricsMap{} // Start empty
+	zedagentMetrics := zedcloud.GetCloudMetrics(log)
+	if zedagentMetrics != nil {
+		cms = zedcloud.Append(cms, zedagentMetrics)
+	}
 	if clientMetrics != nil {
 		cms = zedcloud.Append(cms, clientMetrics)
 	}
@@ -338,6 +346,7 @@ func publishMetrics(ctx *zedagentContext, iteration int) {
 			urlMet.SentByteCount = um.SentByteCount
 			urlMet.RecvMsgCount = um.RecvMsgCount
 			urlMet.RecvByteCount = um.RecvByteCount
+			urlMet.TotalTimeSpent = um.TotalTimeSpent
 			metric.UrlMetrics = append(metric.UrlMetrics, urlMet)
 		}
 		ReportDeviceMetric.Zedcloud = append(ReportDeviceMetric.Zedcloud,
