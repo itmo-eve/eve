@@ -297,22 +297,6 @@ for f in "$dir"/*.json; do
     cp -p "$f" $DPCDIR
 done
 
-# Get IP addresses
-echo "$(date -Ins -u) Starting nim"
-$BINDIR/nim &
-wait_for_touch nim
-
-# Add nim to watchdog
-touch "$WATCHDOG_FILE/nim.touch"
-
-# Wait for having IP addresses for a few minutes
-# so that we are likely to have an address when we run ntp
-echo "$(date -Ins -u) Starting waitforaddr"
-$BINDIR/waitforaddr
-
-# Deposit any diag information from nim
-access_usb
-
 # We need to try our best to setup time *before* we generate the certifiacte.
 # Otherwise the cert may have start date in the future or in 1970
 echo "$(date -Ins -u) Check for NTP config"
@@ -325,6 +309,25 @@ else
     echo "$(date -Ins -u) No ntpd"
 fi
 
+# Get IP addresses
+echo "$(date -Ins -u) Starting nim"
+$BINDIR/nim &
+wait_for_touch nim
+
+# Add nim to watchdog
+touch "$WATCHDOG_FILE/nim.touch"
+
+# Print diag output forever on changes
+$BINDIR/diag -f -o /dev/console &
+
+# Wait for having IP addresses for a few minutes
+# so that we are likely to have an address when we run ntp
+echo "$(date -Ins -u) Starting waitforaddr"
+$BINDIR/waitforaddr
+
+# Deposit any diag information from nim
+access_usb
+
 # The device cert generation needs the current time. Some hardware
 # doesn't have a battery-backed clock
 YEAR=$(date +%Y)
@@ -336,9 +339,6 @@ done
 
 # Add ndpd to watchdog
 touch "$WATCHDOG_PID/ntpd.pid"
-
-# Print diag output forever on changes
-$BINDIR/diag -f -o /dev/console &
 
 if [ ! -f $CONFIGDIR/device.cert.pem ]; then
     echo "$(date -Ins -u) Generating a device key pair and self-signed cert (using TPM/TEE if available)"
