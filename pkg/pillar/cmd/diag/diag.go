@@ -265,6 +265,7 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 		log.Fatal(err)
 	}
 
+	timer := time.NewTimer(5 * time.Second)
 	for {
 		select {
 		case change := <-subGlobalConfig.MsgChan():
@@ -284,6 +285,10 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 		case change := <-subDevicePortConfigList.MsgChan():
 			ctx.gotDPCList = true
 			subDevicePortConfigList.ProcessChange(change)
+		case <-timer.C:
+			if time.Now().Year() == 1970 {
+				printOutput(&ctx)
+			}
 		}
 		if !ctx.forever && ctx.gotDNS && ctx.gotBC && ctx.gotDPCList {
 			break
