@@ -167,7 +167,7 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 
 	log.Infof("diag Run: Use V2 API %v", zedcloudCtx.V2API)
 
-	if fileExists(types.DeviceCertName) {
+	if fileExists(types.DeviceCertName) && time.Now().Year() != 1970 {
 		// Load device cert
 		cert, err := zedcloud.GetClientCert()
 		if err != nil {
@@ -265,7 +265,6 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 		log.Fatal(err)
 	}
 
-	timer := time.NewTimer(5 * time.Second)
 	for {
 		select {
 		case change := <-subGlobalConfig.MsgChan():
@@ -285,15 +284,11 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 		case change := <-subDevicePortConfigList.MsgChan():
 			ctx.gotDPCList = true
 			subDevicePortConfigList.ProcessChange(change)
-		case <-timer.C:
-			if time.Now().Year() == 1970 {
-				printOutput(&ctx)
-			}
 		}
 		if !ctx.forever && ctx.gotDNS && ctx.gotBC && ctx.gotDPCList {
 			break
 		}
-		if ctx.usingOnboardCert && fileExists(types.DeviceCertName) {
+		if ctx.usingOnboardCert && fileExists(types.DeviceCertName) && time.Now().Year() != 1970 {
 			fmt.Fprintf(outfile, "WARNING: Switching from onboard to device cert\n")
 			// Load device cert
 			cert, err := zedcloud.GetClientCert()
