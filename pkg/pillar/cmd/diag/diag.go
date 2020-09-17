@@ -167,7 +167,7 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 
 	log.Infof("diag Run: Use V2 API %v", zedcloudCtx.V2API)
 
-	if fileExists(types.DeviceCertName) && time.Now().Year() != 1970 {
+	if fileExists(types.DeviceCertName) {
 		// Load device cert
 		cert, err := zedcloud.GetClientCert()
 		if err != nil {
@@ -288,7 +288,7 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 		if !ctx.forever && ctx.gotDNS && ctx.gotBC && ctx.gotDPCList {
 			break
 		}
-		if ctx.usingOnboardCert && fileExists(types.DeviceCertName) && time.Now().Year() != 1970 {
+		if ctx.usingOnboardCert && fileExists(types.DeviceCertName) {
 			fmt.Fprintf(outfile, "WARNING: Switching from onboard to device cert\n")
 			// Load device cert
 			cert, err := zedcloud.GetClientCert()
