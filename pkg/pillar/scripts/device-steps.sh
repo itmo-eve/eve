@@ -305,9 +305,6 @@ wait_for_touch nim
 # Add nim to watchdog
 touch "$WATCHDOG_FILE/nim.touch"
 
-# Print diag output forever on changes
-$BINDIR/diag -f -o /dev/console &
-
 # Wait for having IP addresses for a few minutes
 # so that we are likely to have an address when we run ntp
 echo "$(date -Ins -u) Starting waitforaddr"
@@ -339,6 +336,9 @@ done
 
 # Add ndpd to watchdog
 touch "$WATCHDOG_PID/ntpd.pid"
+
+# Print diag output forever on changes
+$BINDIR/diag -f -o /dev/console &
 
 if [ ! -f $CONFIGDIR/device.cert.pem ]; then
     echo "$(date -Ins -u) Generating a device key pair and self-signed cert (using TPM/TEE if available)"
