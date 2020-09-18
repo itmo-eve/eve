@@ -16,6 +16,21 @@ const (
 	Modify
 )
 
+// String returns string representation of Operation object
+func (op Operation) String() string {
+	switch op {
+	case Restart:
+		return "Restart"
+	case Create:
+		return "Create"
+	case Delete:
+		return "Delete"
+	case Modify:
+		return "Modify"
+	}
+	return ""
+}
+
 // Change the message to go into a change channel
 type Change struct {
 	// Operation which operation is performed by this change
@@ -28,16 +43,5 @@ type Change struct {
 
 // String returns string representation of Change object
 func (change Change) String() string {
-	operation := ""
-	switch change.Operation {
-	case Restart:
-		operation = "Restart"
-	case Create:
-		operation = "Create"
-	case Delete:
-		operation = "Delete"
-	case Modify:
-		operation = "Modify"
-	}
-	return fmt.Sprintf("operation %s key %s val %s", operation, change.Key, string(change.Value))
+	return fmt.Sprintf("operation %s key %s val %s", change.Operation, change.Key, string(change.Value))
 }
