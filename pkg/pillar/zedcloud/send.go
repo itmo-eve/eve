@@ -196,7 +196,7 @@ func VerifyAllIntf(ctx *ZedCloudContext,
 			// return envelope verifying check. Thus below does not check other values of rtf.
 			resp, _, rtf, err := SendOnIntf(ctx, url, intf, 0, nil, allowProxy)
 			switch rtf {
-			case types.SenderStatusRefused, types.SenderStatusCertInvalid:
+			case types.SenderStatusRefused:
 				remoteTemporaryFailure = true
 			}
 			if resp != nil && resp.StatusCode == http.StatusServiceUnavailable {
