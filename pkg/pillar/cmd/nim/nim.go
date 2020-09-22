@@ -903,7 +903,7 @@ func tryDeviceConnectivityToCloud(ctx *devicenetwork.DeviceNetworkContext) bool 
 		ctx.NetworkTestTimer = time.NewTimer(time.Duration(ctx.NetworkTestInterval) * time.Second)
 		return true
 	}
-	if !ctx.CloudConnectivityWorks && !rtf {
+	if !ctx.CloudConnectivityWorks {
 		// If previous cloud connectivity test also failed, it means
 		// that the current DPC configuration stopped working.
 		// In this case we start the process where device tries to
@@ -921,10 +921,11 @@ func tryDeviceConnectivityToCloud(ctx *devicenetwork.DeviceNetworkContext) bool 
 			// Start DPC verification to find a working configuration
 			devicenetwork.RestartVerify(ctx, "tryDeviceConnectivityToCloud")
 		}
-	} else {
 		if rtf {
 			log.Warnf("tryDeviceConnectivityToCloud: remoteTemporaryFailure: %s", err)
-		} else {
+		}
+	} else {
+		if !rtf {
 			log.Infof("tryDeviceConnectivityToCloud: Device cloud connectivity test restart timer due to %s", err)
 		}
 		// Restart network test timer for next slot.
