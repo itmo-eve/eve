@@ -284,6 +284,15 @@ for f in "$dir"/*.json; do
     cp -p "$f" $DPCDIR
 done
 
+# We need to set date if we lack of RTC to properly communicate with controller
+# We use the last modified time of root-certificate.pem as initial time before ntpd starts
+YEAR=$(date +%Y)
+if [ "$YEAR" = "1970" ]; then
+  if [ -f $CONFIGDIR/root-certificate.pem ]; then
+    date -s "$(stat -c '%y' $CONFIGDIR/root-certificate.pem)"
+  fi
+fi
+
 # Get IP addresses
 echo "$(date -Ins -u) Starting nim"
 $BINDIR/nim &
