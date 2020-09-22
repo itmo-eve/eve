@@ -84,6 +84,7 @@ func createManifestsForBareBlob(artifact *registry.Artifact) ([]*types.BlobStatu
 		State:     types.VERIFIED,
 		MediaType: string(v1types.OCIManifestSchema1),
 		Sha256:    digest.FromBytes(manifestBytes).Encoded(),
+		RefCount:  1,
 	})
 
 	configReaderAt, err := provider.ReaderAt(context.Background(), manifest.Config)
@@ -103,6 +104,7 @@ func createManifestsForBareBlob(artifact *registry.Artifact) ([]*types.BlobStatu
 		State:     types.VERIFIED,
 		MediaType: string(v1types.OCIConfigJSON),
 		Sha256:    manifest.Config.Digest.Encoded(),
+		RefCount:  1,
 	})
 	return blobStatuses, nil
 }

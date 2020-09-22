@@ -85,10 +85,9 @@ func MaybeRemoveVerifyImageConfig(ctx *volumemgrContext, imageSha string) {
 		return
 	}
 	if m.RefCount == 0 {
-		log.Warnf("MaybeRemoveVerifyImageConfig: Attempting to reduce "+
+		log.Fatalf("MaybeRemoveVerifyImageConfig: Attempting to reduce "+
 			"0 RefCount. Image Details - Name: %s, "+
 			"ImageSha256:%s", m.Name, m.ImageSha256)
-		return
 	}
 	m.RefCount -= 1
 	log.Infof("MaybeRemoveVerifyImageConfig: RefCount to %d for %s",
