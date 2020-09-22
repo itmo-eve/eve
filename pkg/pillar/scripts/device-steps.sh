@@ -124,7 +124,7 @@ CONFIGDEV=$(zboot partdev CONFIG)
 # If zedbox is already running we don't have to start it.
 if ! pgrep zedbox >/dev/null; then
     echo "$(date -Ins -u) Starting zedbox"
-    $BINDIR/zedbox &
+    $BINDIR/zedbox -d=true &
     wait_for_touch zedbox
 fi
 
@@ -456,7 +456,7 @@ fi
 
 for AGENT in $AGENTS1; do
     echo "$(date -Ins -u) Starting $AGENT"
-    $BINDIR/"$AGENT" &
+    $BINDIR/"$AGENT" -d=true &
     wait_for_touch "$AGENT"
 done
 
