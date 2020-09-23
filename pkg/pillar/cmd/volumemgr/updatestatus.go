@@ -282,16 +282,23 @@ func doUpdateContentTree(ctx *volumemgrContext, status *types.ContentTreeStatus)
 			return changed, false
 		}
 		for _, loadedBlob := range loadedBlobs {
-			log.Infof("doUpdateContentTree(%s): Successfully loaded blob: %s", status.Key(), loadedBlob.Sha256)
-			if loadedBlob.State == types.LOADED && loadedBlob.HasVerifierRef {
-				log.Infof("doUpdateContentTree(%s): removing verifyRef from Blob %s",
-					status.Key(), loadedBlob.Sha256)
-				MaybeRemoveVerifyImageConfig(ctx, loadedBlob.Sha256)
-				// remove the verifierref and set the path to "" as we delete the verifier path
-				loadedBlob.HasVerifierRef = false
-				loadedBlob.Path = ""
+			// cas client take a time, so we need to lookup new status of blob
+			refreshedBlob := lookupBlobStatus(ctx, loadedBlob.Sha256)
+			if refreshedBlob == nil {
+				refreshedBlob = loadedBlob // use new one if not exists
+			} else {
+				refreshedBlob.State = loadedBlob.State
 			}
-			publishBlobStatus(ctx, loadedBlob)
+			log.Infof("doUpdateContentTree(%s): Successfully loaded blob: %s", status.Key(), refreshedBlob.Sha256)
+			if refreshedBlob.State == types.LOADED && refreshedBlob.HasVerifierRef {
+				log.Infof("doUpdateContentTree(%s): removing verifyRef from Blob %s",
+					status.Key(), refreshedBlob.Sha256)
+				MaybeRemoveVerifyImageConfig(ctx, refreshedBlob.Sha256)
+				// remove the verifierref and set the path to "" as we delete the verifier path
+				refreshedBlob.HasVerifierRef = false
+				refreshedBlob.Path = ""
+			}
+			publishBlobStatus(ctx, refreshedBlob)
 		}
 		log.Infof("doUpdateContentTree(%s) successfully loaded all blobs into CAS", status.Key())
 		status.State = types.VERIFIED
