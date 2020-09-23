@@ -361,7 +361,7 @@ func VerifyDevicePortConfig(ctx *DeviceNetworkContext) {
 			// Wait until we hear from domainmgr before applying (dhcp enable/disable)
 			// and testing this new configuration.
 			return
-		case types.DPC_IPDNS_WAIT, types.DPC_INTF_WAIT, types.DPC_REMOTE_WAIT:
+		case types.DPC_IPDNS_WAIT, types.DPC_INTF_WAIT:
 			// Either addressChange or PendTimer will result in calling us again.
 			duration := time.Duration(ctx.DPCTestDuration) * time.Second
 			pending.PendTimer = time.NewTimer(duration)
@@ -415,7 +415,9 @@ func VerifyDevicePortConfig(ctx *DeviceNetworkContext) {
 			SetupVerify(ctx, nextIndex)
 			continue
 
-		case types.DPC_SUCCESS:
+		case types.DPC_SUCCESS, types.DPC_REMOTE_WAIT:
+			// We treat DPC_REMOTE_WAIT as DPC_SUCCESS because we manage to connect to the controller
+			// and we need to wait for certificate or ECONNREFUSED fix on the server side
 			// Avoid clobbering wrong entry if insert/remove after verification
 			// started
 			tested, index := lookupPortConfig(ctx, pending.PendDPC)
