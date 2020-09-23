@@ -37,11 +37,11 @@ func handleVolumeCreate(ctxArg interface{}, key string,
 	}
 	updateVolumeStatusRefCount(ctx, status)
 	status.ContentFormat = volumeFormat[status.Key()]
+	// XXX note that TotalSize and CurrentSize are not filled in
+	status.FileLocation = status.PathName()
 	if _, err := os.Stat(status.PathName()); err == nil {
 		status.State = types.CREATED_VOLUME
 		status.Progress = 100
-		// XXX note that TotalSize and CurrentSize are not filled in
-		status.FileLocation = status.PathName()
 		status.VolumeCreated = true
 		if status.MaxVolSize == 0 {
 			var err error
