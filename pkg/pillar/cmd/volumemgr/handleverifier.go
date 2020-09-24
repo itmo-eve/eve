@@ -84,6 +84,11 @@ func MaybeRemoveVerifyImageConfig(ctx *volumemgrContext, imageSha string) {
 			imageSha)
 		return
 	}
+	if m.Expired {
+		log.Warnf("MaybeRemoveVerifyImageConfig: already Expired for %s",
+			imageSha)
+		return
+	}
 	if m.RefCount == 0 {
 		log.Fatalf("MaybeRemoveVerifyImageConfig: Attempting to reduce "+
 			"0 RefCount. Image Details - Name: %s, "+
