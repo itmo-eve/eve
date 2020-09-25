@@ -3,6 +3,15 @@
 # Copyright (c) 2018 Zededa, Inc.
 # SPDX-License-Identifier: Apache-2.0
 
+# We need to set date if we lack of RTC to properly communicate with controller
+# We use the last modified time of device-steps.sh as initial time before ntpd starts
+self_timestamp=$(stat -c '%Y' "$0")
+current_timestamp=$(date +%s)
+if [ "$self_timestamp" -ge "$current_timestamp" ];
+then
+    date -s "@$self_timestamp"
+fi
+
 WATCHDOG_PID=/run/watchdog/pid
 WATCHDOG_FILE=/run/watchdog/file
 CONFIGDIR=/config
