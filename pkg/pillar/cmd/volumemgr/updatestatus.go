@@ -182,9 +182,8 @@ func doUpdateContentTree(ctx *volumemgrContext, status *types.ContentTreeStatus)
 				}
 				if blob.IsManifest() {
 					size := resolveManifestSize(ctx, *blob)
-					if size != blob.TotalSize {
-						blob.TotalSize = size
-						publishBlobStatus(ctx, blob)
+					if size != status.TotalSize {
+						status.TotalSize = size
 						changed = true
 					}
 				}
@@ -209,7 +208,7 @@ func doUpdateContentTree(ctx *volumemgrContext, status *types.ContentTreeStatus)
 			status.CurrentSize = currentSize
 			status.TotalSize = totalSize
 			if status.TotalSize > 0 {
-				status.Progress = uint(100 * status.CurrentSize / status.TotalSize)
+				status.Progress = uint(status.CurrentSize / status.TotalSize * 100)
 			}
 			log.Infof("doUpdateContentTree: updating CurrentSize/TotalSize/Progress %d/%d/%d",
 				currentSize, totalSize, status.Progress)

@@ -40,19 +40,15 @@ func handleVolumeCreate(ctxArg interface{}, key string,
 	if _, err := os.Stat(status.PathName()); err == nil {
 		status.State = types.CREATED_VOLUME
 		status.Progress = 100
+		// XXX note that TotalSize and CurrentSize are not filled in
 		status.FileLocation = status.PathName()
 		status.VolumeCreated = true
-		actualSize, maxSize, _, _, err := utils.GetVolumeSize(log, status.FileLocation)
-		if err != nil {
-			log.Error(err)
-		} else {
-			if status.MaxVolSize == 0 {
-				status.MaxVolSize = maxSize
+		if status.MaxVolSize == 0 {
+			var err error
+			_, status.MaxVolSize, _, _, err = utils.GetVolumeSize(log, status.FileLocation)
+			if err != nil {
+				log.Error(err)
 			}
-			// XXX this is not the same as what we downloaded
-			// and created but the best we know
-			status.TotalSize = int64(actualSize)
-			status.CurrentSize = int64(actualSize)
 		}
 		publishVolumeStatus(ctx, status)
 		updateVolumeRefStatus(ctx, status)
