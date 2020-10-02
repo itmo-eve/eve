@@ -1,0 +1,13 @@
+diff -r -u option.c src/option.c
+--- a/src/option.c	2020-07-19 23:54:44.000000000 +0300
++++ b/src/option.c	2020-10-02 08:18:44.039970805 +0300
+@@ -3104,8 +3104,7 @@
+ 	      for (configs = daemon->dhcp_conf; configs; configs = configs->next) 
+ 		if ((configs->flags & CONFIG_ADDR) && configs->addr.s_addr == in.s_addr)
+ 		  {
+-		    sprintf(errstr, _("duplicate dhcp-host IP address %s"),  inet_ntoa(in));
+-		    return 0;
++		    my_syslog(LOG_WARNING, _("duplicate dhcp-host IP address %s"), inet_ntoa(in));
+ 		  }	      
+ 	    }
+ 	  else
