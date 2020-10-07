@@ -1,11 +1,13 @@
 --- images/rootfs.yml.in
 +++ images/rootfs-adam-kvm.yml.in
-@@ -30,6 +30,13 @@ services:
+@@ -30,6 +30,15 @@ services:
       image: RSYSLOGD_TAG
     - name: ntpd
       image: linuxkit/openntpd:v0.5
 +   - name: adam
 +     image: lfedge/adam:latest
++     env:
++     - DB=/persist
 +     binds:
 +        - /var/persist:/persist
 +        - /var/config:/config

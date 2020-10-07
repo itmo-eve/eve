@@ -32,6 +32,8 @@ SSH_PORT=2222
 SSH_PROXY=-L6000:localhost:6000
 # ssh key to be used for getting into an EVE instance
 SSH_KEY=$(CONF_DIR)/ssh.key
+# force V1 api to support Adam inside EVE
+API_V1=$(CONF_DIR)/Force-API-V1
 # Use QEMU H/W accelearation (any non-empty value will trigger using it)
 ACCEL=
 # Location of the EVE configuration folder to be used in builds
@@ -203,7 +205,7 @@ itest: $(GOBUILDER) run-proxy | $(DIST)
 	@cd tests/integration ; CGO_ENABLED=0 GOOS= go test -v -run "$(ITESTS)" .
 
 clean:
-	rm -rf $(DIST) images/*.yml pkg/pillar/Dockerfile pkg/qrexec-lib/Dockerfile pkg/qrexec-dom0/Dockerfile pkg/xen-tools/Dockerfile
+	rm -rf $(DIST) $(API_V1) $(SSH_KEY) images/*.yml pkg/pillar/Dockerfile pkg/qrexec-lib/Dockerfile pkg/qrexec-dom0/Dockerfile pkg/xen-tools/Dockerfile
 
 yetus:
 	@echo Running yetus
@@ -301,6 +303,10 @@ $(SSH_KEY):
 	rm -f $@*
 	ssh-keygen -P "" -f $@
 	mv $@.pub $(CONF_DIR)/authorized_keys
+
+$(API_V1):
+	rm -f $@*
+	touch $@
 
 $(CONFIG_IMG): $(CONF_FILES) | $(INSTALLER)
 	./tools/makeconfig.sh $@ $(CONF_FILES)
@@ -438,7 +444,7 @@ images/rootfs-%.yml.in: images/rootfs.yml.in FORCE
 	@rm $@.sed
 
 $(ROOTFS_FULL_NAME)-adam-kvm-$(ZARCH).$(ROOTFS_FORMAT): $(ROOTFS_FULL_NAME)-kvm-adam-$(ZARCH).$(ROOTFS_FORMAT)
-$(ROOTFS_FULL_NAME)-kvm-adam-$(ZARCH).$(ROOTFS_FORMAT): images/rootfs-%.yml $(SSH_KEY) | $(INSTALLER)
+$(ROOTFS_FULL_NAME)-kvm-adam-$(ZARCH).$(ROOTFS_FORMAT): images/rootfs-kvm-adam.yml $(SSH_KEY) $(API_V1) | $(INSTALLER)
 	./tools/makerootfs.sh $< $@ $(ROOTFS_FORMAT)
 $(ROOTFS_FULL_NAME)-%-$(ZARCH).$(ROOTFS_FORMAT): images/rootfs-%.yml | $(INSTALLER)
 	./tools/makerootfs.sh $< $@ $(ROOTFS_FORMAT)
