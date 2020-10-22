@@ -1,5 +1,5 @@
 ---
-name: Eden
+name: Edenkvm
 on:
   pull_request_review:
     branches: [master]
