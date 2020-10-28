@@ -66,6 +66,10 @@ services:
      image: XENTOOLS_TAG
      cgroupsPath: /eve/services/xen-tools
      oomScoreAdj: -999
+   - name: debug
+     image: DEBUG_TAG
+     cgroupsPath: /eve/services/debug
+     oomScoreAdj: -999
 files:
    - path: /etc/eve-release
      contents: 'EVE_VERSION'

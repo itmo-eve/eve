@@ -1,0 +1,21 @@
+diff --git a/userspace/sysdig/csysdig.cpp b/userspace/sysdig/csysdig.cpp
+index 42af462b..d10ec20c 100644
+--- a/userspace/sysdig/csysdig.cpp
++++ b/userspace/sysdig/csysdig.cpp
+@@ -903,6 +903,7 @@ sysdig_init_res csysdig_init(int argc, char **argv)
+ 				inspector->enable_page_faults();
+ 			}
+ 
++#if !defined(CYGWING_AGENT) && !defined(MINIMAL_BUILD)
+ 			//
+ 			// run k8s, if required
+ 			//
+@@ -958,6 +959,8 @@ sysdig_init_res csysdig_init(int argc, char **argv)
+ 				}
+ 			}
+ 			delete mesos_api;
++#endif // !defined(CYGWING_AGENT) && !defined(MINIMAL_BUILD)
++
+ 			mesos_api = 0;
+ 
+ 			if(output_type == sinsp_table::OT_JSON)
