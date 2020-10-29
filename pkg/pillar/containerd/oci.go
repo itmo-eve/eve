@@ -164,7 +164,7 @@ func (s *ociSpec) UpdateFromDomain(dom types.DomainConfig) {
 
 		m := int64(dom.Memory * 1024)
 		p := uint64(100000)
-		q := int64(100000 * dom.VCpus)
+		q := int64(150000 * dom.VCpus)
 		s.Linux.Resources.Memory.Limit = &m
 		s.Linux.Resources.CPU.Period = &p
 		s.Linux.Resources.CPU.Quota = &q
