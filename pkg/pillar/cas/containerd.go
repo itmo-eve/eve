@@ -583,8 +583,8 @@ func (c *containerdCAS) PrepareContainerRootDir(rootPath, reference, rootBlobSha
 	//Step 1: On device restart, the existing bundle is not deleted, we need to delete the
 	// existing bundle of the container and recreate it. This is safe to run even
 	// when bundle doesn't exist
-	if c.RemoveContainerRootDir(rootPath) != nil {
-		log.Warnf("PrepareContainerRootDir: tried to clean up any existing state, hopefully it worked")
+	if err := c.RemoveContainerRootDir(rootPath); err != nil {
+		log.Warnf("PrepareContainerRootDir: tried to clean up any existing state, hopefully it worked: %s", err.Error())
 	}
 
 	//Step 2: create snapshot of the image so that it can be mounted as container's rootfs.
@@ -634,12 +634,14 @@ func (c *containerdCAS) PrepareContainerRootDir(rootPath, reference, rootBlobSha
 
 // RemoveContainerRootDir removes contents of a container's rootPath and snapshot.
 func (c *containerdCAS) RemoveContainerRootDir(rootPath string) error {
-	//Step 1: Un-mount container's rootfs
-	if err := syscall.Unmount(filepath.Join(rootPath, containerRootfsPath), 0); err != nil {
-		err = fmt.Errorf("RemoveContainerRootDir: exception while unmounting: %v/%v. %v",
-			rootPath, containerRootfsPath, err)
-		log.Error(err.Error())
-		return err
+	if _, err := os.Stat(filepath.Join(rootPath, containerRootfsPath)); !os.IsNotExist(err) {
+		//Step 1: Un-mount container's rootfs
+		if err := syscall.Unmount(filepath.Join(rootPath, containerRootfsPath), 0); err != nil {
+			err = fmt.Errorf("RemoveContainerRootDir: exception while unmounting: %v/%v. %v",
+				rootPath, containerRootfsPath, err)
+			log.Error(err.Error())
+			return err
+		}
 	}
 
 	//Step 2: Clean container rootPath
@@ -648,7 +650,6 @@ func (c *containerdCAS) RemoveContainerRootDir(rootPath string) error {
 		log.Error(err.Error())
 
 		return err
-
 	}
 
 	//Step 3: Remove snapshot created for the image
@@ -658,7 +659,6 @@ func (c *containerdCAS) RemoveContainerRootDir(rootPath string) error {
 		log.Error(err.Error())
 
 		return err
-
 	}
 	return nil
 }
