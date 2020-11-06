@@ -10,6 +10,19 @@ import (
 	"github.com/sirupsen/logrus" // OK for logrus.Fatal
 )
 
+// MaybeRepeatError to use as Error for repeat attempt
+type MaybeRepeatError struct {
+	msg string
+}
+
+// NewMaybeRepeatError returns new MaybeRepeatError
+func NewMaybeRepeatError(err string) MaybeRepeatError {
+	return MaybeRepeatError{err}
+}
+
+// Error returns new message
+func (e MaybeRepeatError) Error() string { return e.msg }
+
 // Common error with timestamp
 
 // ErrorAndTime is used by many EVE agents

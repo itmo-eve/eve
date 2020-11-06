@@ -592,7 +592,8 @@ func (c *containerdCAS) PrepareContainerRootDir(rootPath, reference, rootBlobSha
 	if err := c.CreateSnapshotForImage(snapshotID, reference); err != nil {
 		err = fmt.Errorf("PrepareContainerRootDir: Could not create snapshot %s. %v", snapshotID, err)
 		log.Errorf(err.Error())
-		return err
+		// we may have problems with concurrent loading of blobs, so let it try again
+		return types.NewMaybeRepeatError(err.Error())
 	}
 
 	//Step 3: write OCI image config/spec json under the container's rootPath.
@@ -704,14 +705,16 @@ func (c *containerdCAS) IngestBlobsAndCreateImage(reference string, root types.B
 			err = fmt.Errorf("IngestBlobsAndCreateImage: could not reference %s with rootBlob %s: %v",
 				reference, rootBlobSha, err.Error())
 			log.Errorf(err.Error())
-			return nil, err
+			// we may have problems with concurrent loading of blobs, so let it try again
+			return nil, types.NewMaybeRepeatError(err.Error())
 		}
 	} else {
 		if err := c.ReplaceImage(reference, mediaType, rootBlobSha); err != nil {
 			err = fmt.Errorf("IngestBlobsAndCreateImage: could not update reference %s with rootBlob %s: %v",
 				reference, rootBlobSha, err.Error())
 			log.Errorf(err.Error())
-			return nil, err
+			// we may have problems with concurrent loading of blobs, so let it try again
+			return nil, types.NewMaybeRepeatError(err.Error())
 		}
 	}
 	return loadedBlobs, nil

@@ -323,6 +323,10 @@ func doUpdateContentTree(ctx *volumemgrContext, status *types.ContentTreeStatus)
 		if wres != nil {
 			log.Infof("doUpdateContentTree(%s): IngestWorkResult found", status.Key())
 			if wres.Error != nil {
+				// we should repeat in case of special error from worker
+				if _, repeat := wres.Error.(types.MaybeRepeatError); repeat {
+					AddWorkLoad(ctx, status)
+				}
 				err := fmt.Errorf("doUpdateContentTree(%s): IngestWorkResult error, exception while loading blobs into CAS: %v", status.Key(), wres.Error)
 				log.Errorf(err.Error())
 				status.SetErrorWithSource(err.Error(), types.ContentTreeStatus{}, wres.ErrorTime)
@@ -478,7 +482,11 @@ func doUpdateVol(ctx *volumemgrContext, status *types.VolumeStatus) (bool, bool)
 					changed = true
 				}
 				if vr.Error != nil {
-					log.Errorf("doUpdate: Error recieved from the volume worker %v",
+					// we should repeat in case of special error from worker
+					if _, repeat := vr.Error.(types.MaybeRepeatError); repeat {
+						AddWorkCreate(ctx, status)
+					}
+					log.Errorf("doUpdate: Error received from the volume worker %v",
 						vr.Error)
 					status.SetErrorWithSource(vr.Error.Error(),
 						types.VolumeStatus{}, vr.ErrorTime)
