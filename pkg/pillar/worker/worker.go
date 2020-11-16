@@ -285,12 +285,22 @@ func (w *Worker) lookupResultLocked(key string) *WorkResult {
 
 // addResultLocked assumes caller holds lock
 func (w *Worker) addResultLocked(key string, res WorkResult) {
-	w.resultMap[key] = res
+	if _, exists := w.resultMap[key]; exists {
+		w.log.Tracef("addResultLocked: %s already exists in resultMap", key)
+	} else {
+		w.log.Tracef("addResultLocked: %s", key)
+		w.resultMap[key] = res
+	}
 }
 
 // deleteResultLocked assumes caller holds lock
 func (w *Worker) deleteResultLocked(key string) {
-	delete(w.resultMap, key)
+	if _, exists := w.resultMap[key]; !exists {
+		w.log.Tracef("deleteResultLocked: %s not exists in resultMap", key)
+	} else {
+		w.log.Tracef("deleteResultLocked: %s", key)
+		delete(w.resultMap, key)
+	}
 }
 
 // Processor struct that can process results

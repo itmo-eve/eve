@@ -328,12 +328,16 @@ func TestGC(t *testing.T) {
 	// Pick up 1 second one and two second one
 	proc2 := <-wp.MsgChan()
 	proc2.Process(ctx, true)
+	wr := wp.Pop(testname + "2")
+	assert.Equal(t, testname+"2", wr.Key)
 	assert.Equal(t, 3, wp.NumPending())
 	assert.Equal(t, testname+"2", res.Key)
 	assert.Equal(t, sleep1.generateOutput, res.Output)
 
 	proc3 := <-wp.MsgChan()
 	proc3.Process(ctx, true)
+	wr = wp.Pop(testname + "3")
+	assert.Equal(t, testname+"3", wr.Key)
 	assert.Equal(t, 2, wp.NumPending())
 	assert.Equal(t, testname+"3", res.Key)
 	assert.Equal(t, sleep3.generateOutput, res.Output)
@@ -347,7 +351,7 @@ func TestGC(t *testing.T) {
 	assert.True(t, done)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, wp.NumWorkers())
-	assert.Equal(t, 2, wp.NumPending())
+	assert.Equal(t, 3, wp.NumPending())
 
 	proc4 := <-wp.MsgChan()
 	proc4.Process(ctx, true)
@@ -366,7 +370,7 @@ func TestGC(t *testing.T) {
 	assert.Equal(t, 0, wp.NumPending())
 	assert.Equal(t, testname+"1", res.Key)
 	assert.Equal(t, sleep20.generateOutput, res.Output)
-	assert.Equal(t, 2, wp.NumWorkers())
+	assert.Equal(t, 1, wp.NumWorkers())
 
 	wp.Done()
 	_, ok := <-wp.MsgChan()
