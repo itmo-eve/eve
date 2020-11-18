@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/eriknordmark/netlink"
@@ -1391,6 +1392,7 @@ func executeIPTablesRule(operation string, rule types.IPTablesRule) error {
 		err = iptables.IptableCmd(log, ruleStr...)
 		if operation == "-D" && rule.Table == "mangle" {
 			if rule.ActionChainName != "" {
+				log.Functionf("executeIPTablesRule: %s", iptables.GetIpChainRefs(log, rule.ActionChainName, "mangle"))
 				chainFlush := []string{"-t", "mangle", "--flush", rule.ActionChainName}
 				chainDelete := []string{"-t", "mangle", "-X", rule.ActionChainName}
 				err = iptables.IptableCmd(log, chainFlush...)
@@ -1580,13 +1582,26 @@ func createMarkAndAcceptChain(aclArgs types.AppNetworkACLArgs,
 		return errors.New("Invalid chain creation")
 	}
 
+	chainFlush := []string{"-t", "mangle", "--flush", name}
+	chainDelete := []string{"-t", "mangle", "-X", name}
+
 	newChain := []string{"-t", "mangle", "-N", name}
 	log.Functionf("createMarkAndAcceptChain: Creating new chain (%s)", name)
 	err := iptables.IptableCmd(log, newChain...)
 	if err != nil {
-		log.Errorf("createMarkAndAcceptChain: New chain (%s) creation failed: %s",
+		// if chain already exists, we can skip this error
+		if !strings.Contains(err.Error(), "Chain already exists") {
+			log.Errorf("createMarkAndAcceptChain: New chain (%s) creation failed: %s",
+				name, err)
+			return err
+		}
+		log.Warningf("createMarkAndAcceptChain: New chain (%s) creation failed skipped: %s",
 			name, err)
-		return err
+		if err := iptables.IptableCmd(log, chainFlush...); err != nil {
+			log.Errorf("createMarkAndAcceptChain: Flush exists chain (%s) failed: %s",
+				name, err)
+			return err
+		}
 	}
 
 	rule1 := []string{"-A", name, "-t", "mangle", "-j", "CONNMARK", "--restore-mark"}
@@ -1603,9 +1618,6 @@ func createMarkAndAcceptChain(aclArgs types.AppNetworkACLArgs,
 	}
 	rule4 := []string{"-A", name, "-t", "mangle", "-j", "CONNMARK", "--restore-mark"}
 	rule5 := []string{"-A", name, "-t", "mangle", "-j", "ACCEPT"}
-
-	chainFlush := []string{"-t", "mangle", "--flush", name}
-	chainDelete := []string{"-t", "mangle", "-X", name}
 
 	err = iptables.IptableCmd(log, rule1...)
 	if err != nil {

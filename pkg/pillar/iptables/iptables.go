@@ -380,3 +380,22 @@ func parseline(log *base.LogObject, line string, table string, ipVer int) *AclCo
 	}
 	return &ac
 }
+
+//GetIpChainRefs returns lines from table which contains
+//ref to defined chain
+func GetIpChainRefs(log *base.LogObject, chain, table string) (lines []string) {
+	out, err := IptableCmdOut(log, "-t", table, "-S", "-v")
+	if err != nil {
+		log.Errorf("GetIpChainRefs: iptables -t %s -S failed %s\n", table, err)
+	} else {
+		for _, line := range strings.Split(out, "\n") {
+			if strings.Contains(line, fmt.Sprintf("-j %s", chain)) {
+				log.Warningf("1: %s", line)
+				lines = append(lines, line)
+			} else {
+				log.Warningf("0: %s", line)
+			}
+		}
+	}
+	return
+}
