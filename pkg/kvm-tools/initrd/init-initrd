@@ -1,5 +1,9 @@
 #!/bin/sh
 
+exec 1 > /dev/console
+exec 2 > /dev/console
+
+
 # first make sure busybox gets expanded into the glory that is UNIX
 /bin/busybox --install /bin
 
@@ -37,10 +41,6 @@ mount -t devpts -o gid=5,mode=0620,noexec,nosuid devpts /mnt/rootfs/dev/pts
 mount -t tmpfs -o nodev,nosuid,noexec,size=20% shm /mnt/rootfs/dev/shm
 mount -t tmpfs -o nodev,nosuid,noexec,size=20% tmp /mnt/rootfs/tmp
 mount -t mqueue -o nodev,nosuid,noexec none /mnt/rootfs/dev/mqueue
-ln -s /proc/self/fd /mnt/rootfs/dev/fd
-ln -s /proc/self/fd/0 /mnt/rootfs/dev/stdin
-ln -s /proc/self/fd/1 /mnt/rootfs/dev/stdout
-ln -s /proc/self/fd/2 /mnt/rootfs/dev/stderr
 
 ip=$(grep -o '\bip=[^ ]*' /proc/cmdline | cut -d = -f 2)
 gw=$(grep -o '\bgw=[^ ]*' /proc/cmdline | cut -d = -f 2)
