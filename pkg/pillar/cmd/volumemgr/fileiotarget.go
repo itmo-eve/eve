@@ -27,8 +27,6 @@ func TargetCreate(status types.VolumeStatus) error {
 		//*/
 
 	var targetRoot = filepath.Join("/sys/kernel/config/target/core/fileio_0/", status.DisplayName)
-	log.Error("[targetRoot]>>>>" + targetRoot)
-	log.Error("[CWD]>>>>" + os.Getwd())
 	if err := os.MkdirAll(targetRoot, 0755); err != nil {
 		log.Error(fmt.Sprintf("Error create catalog in sysfs for target filio [%v]", err))
 		return err
