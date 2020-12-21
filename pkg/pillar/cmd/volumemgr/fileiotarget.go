@@ -15,18 +15,7 @@ import (
 // TargetCreate - Create fileio target for volume
 func TargetCreate(status types.VolumeStatus) error {
 
-	/*
-		var script = [...]string{
-			fmt.Sprintf(`mkdir -p /sys/kernel/config/target/core/fileio_0/%v`, status.DisplayName),
-			fmt.Sprintf(`echo "fd_dev_name=%v,fd_dev_size=%v,fd_buffered_io=1" > /sys/kernel/config/target/core/fileio_0/%v/control`, status.PathName(), status.CurrentSize, status.DisplayName),
-			fmt.Sprintf(`echo 4096 > /sys/kernel/config/target/core/fileio_0/%v/attrib/block_size`, status.DisplayName),
-			fmt.Sprintf(`echo "%s" > /sys/kernel/config/target/core/fileio_0/%v/wwn/vpd_unit_serial`, status.VolumeID, status.DisplayName),
-			fmt.Sprintf(`echo -n "%v" >/sys/kernel/config/target/core/fileio_0/%v/udev_path`, status.PathName(), status.DisplayName),
-			fmt.Sprintf(`echo 1 > /sys/kernel/config/target/core/fileio_0/%v/enable`, status.DisplayName),
-		}
-		//*/
-
-	var targetRoot = filepath.Join("/sys/kernel/config/target/core/fileio_0/", status.DisplayName)
+	var targetRoot = filepath.Join("/hostfs/sys/kernel/config/target/core/fileio_0/", status.DisplayName)
 	if err := os.MkdirAll(targetRoot, 0755); err != nil {
 		log.Error(fmt.Sprintf("Error create catalog in sysfs for target filio [%v]", err))
 		return err
@@ -63,7 +52,7 @@ func TargetCreate(status types.VolumeStatus) error {
 		return err
 	}
 
-	log.Error(fmt.Sprintf("Created target fileIO for [%v]:[%v] size=[%v] UUID:%s", status.DisplayName, status.PathName(), status.MaxVolSize, status.VolumeID))
+	log.Functionf(fmt.Sprintf("Created target fileIO for [%v]:[%v] size=[%v] UUID:%s", status.DisplayName, status.PathName(), status.MaxVolSize, status.VolumeID))
 
 	return nil
 }

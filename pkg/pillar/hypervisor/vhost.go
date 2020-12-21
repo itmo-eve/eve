@@ -16,17 +16,28 @@ func VhostCreate(status types.DiskStatus) (string, error) {
 	var wwn = x.DeviceWWN()
 	var wwnNexus = x.NexusWWN()
 
-	var script = [...]string{
-		fmt.Sprintf(`mkdir -p /sys/kernel/config/target/vhost/%v/tpgt_1/lun/lun_0`, wwn),
-		fmt.Sprintf(`echo -n 'scsi_host_id=1,scsi_channel_id=0,scsi_target_id=0,scsi_lun_id=0' > /sys/kernel/config/target/core/fileio_0/%v/control`, status.DisplayName),
-		fmt.Sprintf(`echo -n %v > /sys/kernel/config/target/vhost/%v/tpgt_1/nexus`, wwnNexus, wwn),
-		fmt.Sprintf(`cd /sys/kernel/config/target/vhost/%v/tpgt_1/lun/lun_0 && ln -s ../../../../../core/fileio_0/%v/ .`, wwn, status.DisplayName),
+	var targetRoot = fmt.Sprintf(`/hostfs/sys/kernel/config/target/core/fileio_0/%v`, status.DisplayName)
+	var vhostRoot = fmt.Sprintf(`/hostfs/sys/kernel/config/target/vhost/%v/tpgt_1/lun/lun_0`, wwn)
+	if err := os.MkdirAll(vhostRoot, 0755); err != nil {
+		logError(fmt.Sprintf("Error create catalog in sysfs for vhost filio [%v]", err))
+		return err
 	}
 
-	for _, cmd := range script {
-		if err := exec.Command("bash", "-c", cmd).Run(); err != nil {
-			logError("Failed to execute command [%s]: %v", cmd, err)
-		}
+	var controlPath = filepath.Join(targetRoot, "control")
+	if err := ioutil.WriteFile(controlPath, []byte("scsi_host_id=1,scsi_channel_id=0,scsi_target_id=0,scsi_lun_id=0"), 0660); err != nil {
+		logError(fmt.Sprintf("Error set control: %v", err))
+		return err
+	}
+
+	var nexusPath = fmt.Sprintf(`/hostfs/sys/kernel/config/target/vhost/%v/tpgt_1/nexus`, wwn)
+	if err := ioutil.WriteFile(nexusPath, []byte(wwnNexus), 0660); err != nil {
+		logError(fmt.Sprintf("Error set control: %v", err))
+		return err
+	}
+
+	var script = fmt.Sprintf(`cd /hostfs/sys/kernel/config/target/vhost/%v/tpgt_1/lun/lun_0 && ln -s ../../../../../core/fileio_0/%v/ .`, wwn, status.DisplayName)
+	if err := exec.Command("bash", "-c", script).Run(); err != nil {
+		logError("Failed to execute command [%s]: %v", cmd, err)
 	}
 
 	logError("Create vhost for %v, wwn %v", status.DisplayName, wwn)
