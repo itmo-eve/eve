@@ -53,7 +53,7 @@ func TargetCreate(status types.VolumeStatus) error {
 
 	var udevPath = filepath.Join(targetRoot, "udev_path")
 	if err := ioutil.WriteFile(udevPath, []byte(status.PathName()), 0660); err != nil {
-		log.Error(fmt.Sprintf("Error set udev", err))
+		log.Error(fmt.Sprintf("Error set udev %v", err))
 		return err
 	}
 
