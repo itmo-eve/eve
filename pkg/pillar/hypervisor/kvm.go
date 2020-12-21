@@ -238,18 +238,17 @@ const qemuDiskTemplate = `
   addr = "{{.PCIId}}"
 {{else}}
 [device "pci.{{.PCIId}}"]
-  driver = "vhost-scsi-pci"
-  wwpn = "{{.LunWWN}}"
+  driver = "pcie-root-port"
+  port = "1{{.PCIId}}"
+  chassis = "{{.PCIId}}"
   bus = "pcie.0"
   addr = "{{.PCIId}}"
 
-{{if .ReadOnly}}  readonly = "on"{{end}}
 [device "virtio-disk{{.DiskID}}"]
-  driver = "virtio-blk-pci"
-  scsi = "off"
+  driver = "vhost-scsi-pci"
   bus = "pci.{{.PCIId}}"
   addr = "0x0"
-  drive = "drive-virtio-disk{{.DiskID}}"
+  wwpn = "{{.LunWWN}}"
 {{end}}`
 
 const qemuNetTemplate = `
@@ -469,12 +468,14 @@ func (ctx kvmContext) CreateDomConfig(domainName string, config types.DomainConf
 		Parse(qemuDiskTemplate)
 	for _, ds := range diskStatusList {
 		var err error
-		if diskContext.LunWWN, err = VhostCreate(ds); err != nil {
-			logError("Failed to create VHost fabric %v", err)
-		}
 
 		if ds.Devtype == "" {
 			continue
+		}
+		if ds.Devtype == "hdd" {
+			if diskContext.LunWWN, err = VhostCreate(ds); err != nil {
+				logError("Failed to create VHost fabric for %s: %v", ds.DisplayName, err)
+			}
 		}
 		diskContext.DiskStatus = ds
 		if err := t.Execute(file, diskContext); err != nil {

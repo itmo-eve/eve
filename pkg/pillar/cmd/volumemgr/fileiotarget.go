@@ -22,7 +22,7 @@ func TargetCreate(status types.VolumeStatus) error {
 	}
 
 	var controlPath = filepath.Join(targetRoot, "control")
-	var data = fmt.Sprintf("fd_dev_name=%s,fd_dev_size=%d,fd_buffered_io=1", status.PathName(), status.CurrentSize)
+	var data = fmt.Sprintf("fd_dev_name=%s,fd_dev_size=%d,fd_buffered_io=1", status.PathName(), status.MaxVolSize)
 	if err := ioutil.WriteFile(controlPath, []byte(data), 0660); err != nil {
 		log.Error(fmt.Sprintf("Error set control: %v", err))
 		return err

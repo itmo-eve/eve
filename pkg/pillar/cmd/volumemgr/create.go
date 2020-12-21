@@ -86,6 +86,10 @@ func createVdiskVolume(ctx *volumemgrContext, status types.VolumeStatus,
 
 	log.Functionf("Extract DONE from %s to %s", ref, filelocation)
 
+	if err := TargetCreate(status); err != nil {
+		log.Errorf("Failed to create FileIO target %v", err)
+	}
+
 	log.Functionf("createVdiskVolume(%s) DONE", status.Key())
 	return true, filelocation, nil
 }
@@ -118,10 +122,6 @@ func createContainerVolume(ctx *volumemgrContext, status types.VolumeStatus,
 		return created, filelocation, err
 	}
 	log.Functionf("createContainerVolume(%s) DONE", status.Key())
-
-	if err := TargetCreate(status); err != nil {
-		log.Errorf("Failed to create FileIO target %v", err)
-	}
 
 	return true, filelocation, nil
 }
