@@ -4,8 +4,9 @@
 package hypervisor
 
 import (
-	"fmt"
-	"os/exec"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 
 	"github.com/lf-edge/eve/pkg/pillar/types"
 )
@@ -16,30 +17,32 @@ func VhostCreate(status types.DiskStatus) (string, error) {
 	var wwn = x.DeviceWWN()
 	var wwnNexus = x.NexusWWN()
 
-	var targetRoot = fmt.Sprintf(`/hostfs/sys/kernel/config/target/core/fileio_0/%v`, status.DisplayName)
-	var vhostRoot = fmt.Sprintf(`/hostfs/sys/kernel/config/target/vhost/%v/tpgt_1/lun/lun_0`, wwn)
+	var targetRoot = filepath.Join("/hostfs/sys/kernel/config/target/core/fileio_0", status.DisplayName)
+	var vhostRoot = filepath.Join("/hostfs/sys/kernel/config/target/vhost", wwn, "tpgt_1/lun/lun_0")
 	if err := os.MkdirAll(vhostRoot, 0755); err != nil {
-		logError(fmt.Sprintf("Error create catalog in sysfs for vhost filio [%v]", err))
-		return err
+		logError("Error create catalog in sysfs for vhost filio [%v]", err)
+		return "", err
 	}
 
 	var controlPath = filepath.Join(targetRoot, "control")
 	if err := ioutil.WriteFile(controlPath, []byte("scsi_host_id=1,scsi_channel_id=0,scsi_target_id=0,scsi_lun_id=0"), 0660); err != nil {
-		logError(fmt.Sprintf("Error set control: %v", err))
-		return err
+		logError("Error set control: %v", err)
+		return "", err
 	}
 
-	var nexusPath = fmt.Sprintf(`/hostfs/sys/kernel/config/target/vhost/%v/tpgt_1/nexus`, wwn)
+	var nexusPath = filepath.Join("/hostfs/sys/kernel/config/target/vhost", wwn, "tpgt_1/nexus")
 	if err := ioutil.WriteFile(nexusPath, []byte(wwnNexus), 0660); err != nil {
-		logError(fmt.Sprintf("Error set control: %v", err))
-		return err
+		logError("Error set control: %v", err)
+		return "", err
 	}
 
-	var script = fmt.Sprintf(`cd /hostfs/sys/kernel/config/target/vhost/%v/tpgt_1/lun/lun_0 && ln -s ../../../../../core/fileio_0/%v/ .`, wwn, status.DisplayName)
-	if err := exec.Command("bash", "-c", script).Run(); err != nil {
-		logError("Failed to execute command [%s]: %v", cmd, err)
+	var newname = filepath.Join("/hostfs/sys/kernel/config/target/vhost", wwn, "tpgt_1/lun/lun_0", status.DisplayName)
+	var oldname = filepath.Join("/hostfs/sys/kernel/config/target/core/fileio_0", status.DisplayName)
+	if err := os.Symlink(oldname, newname); err != nil {
+		logError("Could not create symbolic link: %v", err)
+		return "", err
 	}
-
+	//var script = fmt.Sprintf(`cd /hostfs/sys/kernel/config/target/vhost/%v/tpgt_1/lun/lun_0 && ln -s ../../../../../core/fileio_0/%v/ .`, wwn, status.DisplayName)
 	logError("Create vhost for %v, wwn %v", status.DisplayName, wwn)
 	return wwn, nil
 }
