@@ -14,7 +14,6 @@ config:
     - /config:/config
     - /:/hostfs
     - /persist:/persist:rshared,rbind
-    - /sys:/sys
   net: host
   capabilities:
     - all
