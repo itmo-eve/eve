@@ -63,6 +63,7 @@ RUN tar xvzf vboot_reference-${VBOOT_COMMIT}.tar.gz
 
 WORKDIR /vboot_reference
 RUN make cgpt LDFLAGS=-static
+RUN strip build/cgpt/cgpt
 RUN cp build/cgpt/cgpt /out/cgpt
 
 FROM scratch
