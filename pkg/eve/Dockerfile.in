@@ -18,5 +18,7 @@ COPY OVMF* /firmware/
 COPY runme.sh /
 RUN mkdir /in /out
 
+LABEL "org.lfedge.eci.artifact.root"="/bits/root.img"
+
 WORKDIR /bits
 ENTRYPOINT ["/runme.sh"]
