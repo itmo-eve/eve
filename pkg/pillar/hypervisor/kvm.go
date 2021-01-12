@@ -245,29 +245,12 @@ const qemuDiskTemplate = `
   bus = "pcie.0"
   addr = "{{.PCIId}}"
 
-[drive "drive-virtio-disk{{.DiskID}}"]
-  file = "{{.FileLocation}}"
-  format = "{{.Format | Fmt}}"
-  aio = "{{.AioType}}"
-  cache = "writeback"
-  if = "none"
 {{if .ReadOnly}}  readonly = "on"{{end}}
-{{- if eq .Devtype "legacy"}}
-[device "ahci.{{.PCIId}}"]
-  bus = "pci.{{.PCIId}}"
-  driver = "ahci"
-
-[device "ahci-disk{{.DiskID}}"]
-  driver = "ide-hd"
-  bus = "ahci.{{.PCIId}}.0"
-{{- else}}
-[device "virtio-disk{{.DiskID}}"]
-  driver = "virtio-blk-pci"
-  scsi = "off"
+[device "vhost-disk{{.DiskID}}"]
+  driver = "vhost-scsi-pci"
+  wwpn = "{{.LunWWN}}"
   bus = "pci.{{.PCIId}}"
   addr = "0x0"
-{{- end}}
-  drive = "drive-virtio-disk{{.DiskID}}"
 {{end}}`
 
 const qemuNetTemplate = `
@@ -451,6 +434,7 @@ func (ctx kvmContext) CreateDomConfig(domainName string, config types.DomainConf
 		Machine               string
 		PCIId, DiskID, SATAId int
 		AioType               string
+		LunWWN                string
 		types.DiskStatus
 	}{Machine: ctx.devicemodel, PCIId: 4, DiskID: 0, SATAId: 0, AioType: "threads"}
 
@@ -480,6 +464,12 @@ func (ctx kvmContext) CreateDomConfig(domainName string, config types.DomainConf
 	for _, ds := range diskStatusList {
 		if ds.Devtype == "" {
 			continue
+		}
+		if ds.Devtype == "hdd" {
+			var err error
+			if diskContext.LunWWN, err = VhostCreate(ds); err != nil {
+				logError("Failed to create VHost fabric %v", err)
+			}
 		}
 		diskContext.DiskStatus = ds
 		if err := t.Execute(file, diskContext); err != nil {
