@@ -1,0 +1,114 @@
+From c8e251f82af97562741e51110ed8828a5c5744c6 Mon Sep 17 00:00:00 2001
+From: Lyle Franklin <lylejfranklin@gmail.com>
+Date: Mon, 5 Aug 2019 06:23:42 -0400
+Subject: [PATCH] Adds basic support for ProxyDHCP
+
+- ProxyDHCP allows a second DHCP server to exist alongside your main
+  DHCP server and supply additional BOOTP related options
+- When u-boot sends out a DHCP request, the real DHCP server will
+  respond with a normal response containing the new client IP address
+  while simultaneously the ProxyDHCP server will respond with a blank
+  client IP address and a `bootfile` option
+- This patch adds CONFIG_SERVERIP_FROM_PROXYDHCP (default false) to
+  enable this behavior and CONFIG_SERVERIP_FROM_PROXYDHCP_DELAY_MS
+  (default 100) which tells u-boot to wait additional time after
+  receiving the main DHCP response to give the ProxyDHCP response time
+  to arrive
+- The PXE spec for ProxyDHCP is more complicated than the solution
+  added here as diagramed on page 16:
+  http://www.pix.net/software/pxeboot/archive/pxespec.pdf:
+
+```
+DHCP Discover will be retried four times. The four timeouts are 4, 8, 16
+and 32 seconds respectively. If a DHCPOFFER is received without an Option
+timeouts in an attempt to receive a PXE response.
+```
+
+- Adding a simple delay worked for my purposes but let me know if a
+  more robust solution is required
+
+---
+diff --git a/net/Kconfig b/net/Kconfig
+index ac6d0cf8a6..3b0e6fcfc3 100644
+@@ -49,4 +49,19 @@ config TFTP_BLOCKSIZE
+ 	  almost-MTU block sizes.
+ 	  You can also activate CONFIG_IP_DEFRAG to set a larger block.
+
++config SERVERIP_FROM_PROXYDHCP
++	bool "Get serverip value from Proxy DHCP response"
++   default y
++	help
++	  Allows bootfile config to be fetched from Proxy DHCP server
++		while IP is obtained from main DHCP server.
++
++config SERVERIP_FROM_PROXYDHCP_DELAY_MS
++	int "# of additional milliseconds to wait for ProxyDHCP response"
++	default 100
++	help
++	  Amount of additional time to wait for ProxyDHCP response after
++		receiving response from main DHCP server. Has no effect if
++		SERVERIP_FROM_PROXYDHCP is false.
++
+ endif   # if NET
+diff --git a/net/bootp.c b/net/bootp.c
+index de3dab4114..163af41e92 100644
+--- a/net/bootp.c
++++ b/net/bootp.c
+@@ -146,10 +146,7 @@ static int check_reply_packet(uchar *pkt, unsigned dest, unsigned src,
+ 	return retval;
+ }
+
+-/*
+- * Copy parameters of interest from BOOTP_REPLY/DHCP_OFFER packet
+- */
+-static void store_net_params(struct bootp_hdr *bp)
++static void store_bootp_params(struct bootp_hdr *bp)
+ {
+ #if !defined(CONFIG_BOOTP_SERVERIP)
+ 	struct in_addr tmp_ip;
+@@ -182,6 +179,16 @@ static void store_net_params(struct bootp_hdr *bp)
+ 	 */
+ 	if (*net_boot_file_name)
+ 		env_set("bootfile", net_boot_file_name);
++#endif
++}
++
++/*
++ * Copy parameters of interest from BOOTP_REPLY/DHCP_OFFER packet
++ */
++static void store_net_params(struct bootp_hdr *bp)
++{
++#if !defined(CONFIG_SERVERIP_FROM_PROXYDHCP)
++	store_bootp_params(bp);
+ #endif
+ 	net_copy_ip(&net_ip, &bp->bp_yiaddr);
+ }
+@@ -1055,8 +1062,12 @@ static void dhcp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
+ 	debug("DHCPHandler: got DHCP packet: (src=%d, dst=%d, len=%d) state: "
+ 	      "%d\n", src, dest, len, dhcp_state);
+
+-	if (net_read_ip(&bp->bp_yiaddr).s_addr == 0)
++	if (net_read_ip(&bp->bp_yiaddr).s_addr == 0) {
++#if defined(CONFIG_SERVERIP_FROM_PROXYDHCP)
++		store_bootp_params(bp);
++#endif
+ 		return;
++	}
+
+ 	switch (dhcp_state) {
+ 	case SELECTING:
+@@ -1075,6 +1086,12 @@ static void dhcp_handler(uchar *pkt, unsigned dest, struct in_addr sip,
+ 			dhcp_packet_process_options(bp);
+ 			efi_net_set_dhcp_ack(pkt, len);
+
++#if defined(CONFIG_SERVERIP_FROM_PROXYDHCP)
++			if (!net_server_ip.s_addr)
++				udelay(CONFIG_SERVERIP_FROM_PROXYDHCP_DELAY_MS *
++					1000);
++#endif	/* CONFIG_SERVERIP_FROM_PROXYDHCP */
++
+ 			debug("TRANSITIONING TO REQUESTING STATE\n");
+ 			dhcp_state = REQUESTING;
+
+--
+2.25.1
