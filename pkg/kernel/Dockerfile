@@ -47,7 +47,7 @@ SHELL ["/bin/sh", "-c", "export KERNEL_SERIES=$(eval echo \\$KERNEL_VERSION_$(un
 # We copy the entire directory. This copies some unneeded files, but
 # allows us to check for the existence /patches-${KERNEL_SERIES} to
 # build kernels without patches.
-COPY / /
+COPY /keys.asc /keys.asc
 
 # Download and verify kernel
 # PGP keys: 589DA6B1 (greg@kroah.com) & 6092693E (autosigner@kernel.org) & 00411886 (torvalds@linux-foundation.org)
@@ -66,6 +66,8 @@ RUN KERNEL_VERSION="$(eval echo \$KERNEL_VERSION_"$(uname -m)")" && KERNEL_MAJOR
     gpg2 --verify linux-${KERNEL_VERSION}.tar.sign linux-${KERNEL_VERSION}.tar && \
     cat linux-${KERNEL_VERSION}.tar | tar --absolute-names -x && mv /linux-${KERNEL_VERSION} /linux && \
     mkdir /out && echo "KERNEL_SOURCE=${KERNEL_SOURCE}" > /out/kernel-source-info
+
+COPY / /
 
 # Apply local patches
 WORKDIR /linux
