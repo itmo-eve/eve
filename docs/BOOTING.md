@@ -147,3 +147,13 @@ decide to implement IMGA/IMGB partition selection directly in u-boot to support 
 up until this point, it seems that all the boards that are modern enough to support EVE's virtualization requirements are also modern
 enough to support UEFI environment directly (even for HiKey where we're currently using u-boot as a stop gap measure the proper
 [UEFI implementation](https://github.com/pftf/RPi4) is very much in the works).
+
+## Booting Raspberry Pi with netboot
+
+In order to boot RPi 4 from network you should modify bootloader configuration as described [here](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2711_bootloader_config.md).
+You should modify BOOT_ORDER to one that uses NETWORK mode (for example `0xf12`).
+
+Next, you need to extract needed files with something like `docker run lfedge/eve:latest-arm64 installer_net |tar xf -`.
+You will see a set of files in the current directory to locate into you tftp server. Also, you should set dhcp-boot option of your
+dhcp server to `ipxe.efi` (actually, it will use configuration from `ipxe.efi.cfg`). Files `kernel`, `initrd.img` and `initrd.bits`
+should be available via HTTP/HTTPs and you need to modify `ipxe.efi.cfg` with location of those files.
