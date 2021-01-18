@@ -117,13 +117,25 @@ do_installer_net() {
   cat > /ipxe.efi.cfg <<__EOT__
 #!ipxe
 # dhcp
+#
+# Uncomment ntp lines for devices without RTC (RPI for example)
+# echo Getting the current time from ntp...
+# :retry_ntp
+# ntp pool.ntp.org || goto retry_ntp
+#
 # chain --autofree https://github.com/lf-edge/eve/releases/download/1.2.3/ipxe.efi.cfg
 kernel kernel eve_installer=\${mac:hexhyp} fastboot console=ttyS0 console=ttyS1 console=ttyS2 console=ttyAMA0 console=ttyAMA1 console=tty0 initrd=initrd.img initrd=initrd.bits
 initrd initrd.img
 initrd initrd.bits
 boot
 __EOT__
-  tar -C / -chvf /output.net ipxe.efi.cfg kernel initrd.img initrd.bits
+  cat > /tmp/boot.scr <<__EOT__
+dhcp
+tftpboot \${kernel_addr_r} ipxe.efi
+bootefi \${kernel_addr_r}
+__EOT__
+  mkimage -A "$(uname -m | sed "s/aarch64/arm64/")" -O linux -T script -C none -a 0 -e 0 -n "U-boot Boot Script" -d /tmp/boot.scr /boot.scr.uimg
+  tar -C / -chvf /output.net ipxe.efi.cfg kernel initrd.img initrd.bits boot.scr.uimg
   dump /output.net installer.net
 }
 

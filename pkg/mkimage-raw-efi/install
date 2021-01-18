@@ -156,7 +156,7 @@ if [ -n "$CONFIG_PART" ] ; then
    ln -s /dev/$CONFIG_PART /parts/config.img
 fi
 
-for i in persist.img config.img rootfs.img EFI ; do
+for i in persist.img config.img rootfs.img EFI boot; do
    SOURCE="/bits/$i"
    [ -e "$SOURCE" ] || SOURCE=/dev/null
    [ -L /parts/$i ] || ln -s "$SOURCE" /parts/$i
@@ -169,6 +169,8 @@ grep -q eve_install_skip_config /proc/cmdline && trunc /parts/persist.img
 # we may be asked to pause before install procedure
 grep -q eve_pause_before_install /proc/cmdline && pause "formatting the /dev/$INSTALL_DEV"
 
+if [ "$(uname -m)" = aarch64 ];then MAKE_RAW_PARTS="boot imga imgb conf persist"; else MAKE_RAW_PARTS="efi imga imgb conf persist"; fi
+
 # FIXME: gross hack to allow P3 partition on a disk different from a bootable one
 # this needs to go away the moment we implement LVM or ZFS
 if [ "$INSTALL_DEV" != "$INSTALL_PERSIST" ]; then
@@ -179,7 +181,7 @@ if [ "$INSTALL_DEV" != "$INSTALL_PERSIST" ]; then
    sgdisk --new 1:2048:0 --typecode=1:5f24425a-2dfa-11e8-a270-7b663faccc2c --change-name=1:P3 "$PDEV"
    sgdisk -v "$PDEV"
    # force make-raw to skip persist
-   MAKE_RAW_PARTS="efi imga imgb conf"
+   if [ "$(uname -m)" = aarch64 ];then MAKE_RAW_PARTS="boot imga imgb conf"; else MAKE_RAW_PARTS="efi imga imgb conf"; fi
 fi
 
 # do the install (unless we're only here to collect the black box)
