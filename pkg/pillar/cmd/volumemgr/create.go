@@ -89,9 +89,9 @@ func createVdiskVolume(ctx *volumemgrContext, status types.VolumeStatus,
 	log.Functionf("createVdiskVolume(%s) DONE", status.Key())
 
 	if err := TargetCreate(status); err != nil {
-		log.Errorf("Failed to create FileIO target %v", err)
+		log.Error(err)
 	}
-	
+
 	return true, filelocation, nil
 }
 
