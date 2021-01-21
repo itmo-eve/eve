@@ -150,10 +150,37 @@ enough to support UEFI environment directly (even for HiKey where we're currentl
 
 ## Booting Raspberry Pi with netboot
 
-In order to boot RPi 4 from network you should modify bootloader configuration as described [here](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2711_bootloader_config.md).
-You should modify BOOT_ORDER to one that uses NETWORK mode (for example `0xf12`).
 
-Next, you need to extract needed files with something like `docker run lfedge/eve:latest-arm64 installer_net |tar xf -`.
-You will see a set of files in the current directory to locate into you tftp server. Also, you should set dhcp-boot option of your
+### Boot flow
+
+* board loads custom firmware blobs and `config.txt` from tftp
+* inside config.txt we define `u-boot.bin` as kernel, so, board loads it from tftp
+* u-boot loads `boot.scr.uimg` via tftp which fires script inside (load `ipxe.efi` from tftp and run `bootefi`)
+* ipxe requests dhcp option [67 Bootfile-Name](https://tools.ietf.org/html/rfc2132#section-9.5) which should point to
+  `ipxe.efi`(actually, it will use configuration from `ipxe.efi.cfg` located on tftp).
+  which location you can modify with [66 Server-Name](https://tools.ietf.org/html/rfc2132#section-9.4) option.
+* ipxe reads `ipxe.efi.cfg` and boots `kernel`, `initrd.img` and `initrd.bits` from locations defined inside `ipxe.efi.cfg`
+
+### Enable netboot on Raspberry Pi
+
+In order to boot RPi 4 from tftp, you should modify bootloader configuration as
+described [here](https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2711_bootloader_config.md).
+You should modify BOOT_ORDER to one that uses NETWORK mode (for example `0xf121`):
+
+```shell
+RPI_EEPROM_VERSION=pieeprom-2021-01-16
+wget https://github.com/raspberrypi/rpi-eeprom/raw/master/firmware/beta/${RPI_EEPROM_VERSION}.bin
+sudo apt update
+sudo apt install rpi-eeprom -y
+sudo rpi-eeprom-config ${RPI_EEPROM_VERSION}.bin > bootconf.txt
+sed -i 's/BOOT_ORDER=.*/BOOT_ORDER=0xf241/g' bootconf.txt
+sudo rpi-eeprom-config --out ${RPI_EEPROM_VERSION}-netboot.bin --config bootconf.txt ${RPI_EEPROM_VERSION}.bin
+sudo rpi-eeprom-update -d -f ./${RPI_EEPROM_VERSION}-netboot.bin
+```
+
+### Files to load into tftp/http
+
+You need to extract needed files with something like `docker run lfedge/eve:latest-arm64 installer_net |tar xf -`.
+You will see a set of files in the current directory to locate into you tftp server to boot Raspberry from it. Also, you should set dhcp-boot option of your
 dhcp server to `ipxe.efi` (actually, it will use configuration from `ipxe.efi.cfg`). Files `kernel`, `initrd.img` and `initrd.bits`
 should be available via HTTP/HTTPs and you need to modify `ipxe.efi.cfg` with location of those files.
