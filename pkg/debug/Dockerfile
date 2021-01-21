@@ -37,6 +37,21 @@ RUN for patch in fix-musl-sc_long_bit.patch wrapper-for-basename.patch 155652295
  make -C src RPM_OPT_FLAGS=-DNONLS static &&\
  cp src/lshw-static /lshw && strip /lshw
 
+FROM alpine:3.12 as pprof-build
+
+ENV GPERFTOOLS_TAG gperftools-2.8.1
+ENV GPERFTOOLS_REPO https://github.com/gperftools/gperftools.git
+
+RUN apk add --no-cache curl=7.69.1-r3 tar=1.32-r1 make=4.3-r0 linux-headers=5.4.5-r1 patch=2.7.6-r6 g++=9.3.0-r2 \
+    git=2.26.2-r0 autoconf=2.69-r2 automake=1.16.2-r0 cmake=3.17.2-r0
+
+RUN git clone --depth 1 ${GPERFTOOLS_REPO} -b ${GPERFTOOLS_TAG} /gperftools
+RUN mkdir /out && mkdir /gperftools/build
+
+WORKDIR /gperftools/build
+RUN cmake .. && make -j `getconf _NPROCESSORS_ONLN` && cmake --install ./ --prefix /out/usr
+RUN rm -fr /out/usr/include /out/usr/lib64/*.a /out/usr/lib64/pkgconfig
+
 FROM linuxkit/sshd:666b4a1a323140aa1f332826164afba506abf597
 
 COPY ssh.sh /usr/bin/ssh.sh
