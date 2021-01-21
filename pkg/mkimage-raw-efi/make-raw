@@ -141,7 +141,7 @@ do_efi() {
 
 do_boot() {
   mkefifs
-  cp /trampoline.grub.cfg /efifs/EFI/BOOT/grub.cfg
+  sed -e 's#@PATH_TO_GRUB@#'"$(cd /efifs; echo EFI/BOOT/BOOT*EFI)"'#' < /grub.cfg.in > /efifs/EFI/BOOT/grub.cfg
   cp -r /parts/boot/* /efifs/
   do_system_vfat_part "$1" "$BOOT_PART_SIZE"
 }
