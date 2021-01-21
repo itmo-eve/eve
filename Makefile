@@ -8,7 +8,9 @@ GOVER ?= 1.15.3
 PKGBASE=github.com/lf-edge/eve
 GOMODULE=$(PKGBASE)/pkg/pillar
 GOTREE=$(CURDIR)/pkg/pillar
-PATH:=$(CURDIR)/build-tools/bin:$(PATH)
+BUILDTOOLS_BIN=$(CURDIR)/build-tools/bin
+PATH:=$(BUILDTOOLS_BIN):$(PATH)
+ROOTFS_SIZE_MB:=350
 
 export CGO_ENABLED GOOS GOARCH PATH
 
@@ -189,7 +191,7 @@ ifneq ($(ALL_PROXY),)
 DOCKER_ALL_PROXY:=--build-arg all_proxy=$(ALL_PROXY)
 endif
 
-DOCKER_UNPACK= _() { C=`docker create $$1 fake` ; shift ; docker export $$C | tar -xf - "$$@" ; docker rm $$C ; } ; _
+DOCKER_UNPACK= _() { C=`docker create "$$1" fake` ; shift ; docker export "$$C" | tar -xf - "$$@" ; docker rm "$$C" ; } ; _
 DOCKER_GO = _() { mkdir -p $(CURDIR)/.go/src/$${3:-dummy} ; mkdir -p $(CURDIR)/.go/bin ; \
     docker_go_line="docker run $$DOCKER_GO_ARGS -i --rm -u $(USER) -w /go/src/$${3:-dummy} \
     -v $(CURDIR)/.go:/go -v $$2:/go/src/$${3:-dummy} -v $${4:-$(CURDIR)/.go/bin}:/go/bin -v $(CURDIR)/:/eve -v $${HOME}:/home/$(USER) \
@@ -200,7 +202,9 @@ DOCKER_GO = _() { mkdir -p $(CURDIR)/.go/src/$${3:-dummy} ; mkdir -p $(CURDIR)/.
     $$docker_go_line "$$1" ; } ; _
 
 PARSE_PKGS=$(if $(strip $(EVE_HASH)),EVE_HASH=)$(EVE_HASH) DOCKER_ARCH_TAG=$(DOCKER_ARCH_TAG) ./tools/parse-pkgs.sh
-LINUXKIT=$(CURDIR)/build-tools/bin/linuxkit
+LINUXKIT=$(BUILDTOOLS_BIN)/linuxkit
+LINUXKIT_VERSION=80c4edd5c54dc05fbeae932440372990fce39bd6
+LINUXKIT_SOURCE=github.com/linuxkit/linuxkit/src/cmd/linuxkit@$(LINUXKIT_VERSION)
 LINUXKIT_OPTS=--disable-content-trust $(if $(strip $(EVE_HASH)),--hash) $(EVE_HASH) $(if $(strip $(EVE_REL)),--release) $(EVE_REL) $(FORCE_BUILD)
 LINUXKIT_PKG_TARGET=build
 RESCAN_DEPS=FORCE
@@ -514,14 +518,14 @@ shell: $(GOBUILDER)
 #
 # Utility targets in support of our Dockerized build infrastrucutre
 #
-$(LINUXKIT): CGO_ENABLED=0
+
+# build linuxkit for the host OS, not the container OS
 $(LINUXKIT): GOOS=$(shell uname -s | tr '[A-Z]' '[a-z]')
-$(LINUXKIT): $(CURDIR)/build-tools/src/linuxkit/Gopkg.lock $(CURDIR)/build-tools/bin/manifest-tool | $(GOBUILDER)
-	@$(DOCKER_GO) "unset GOFLAGS ; unset GO111MODULE ; go build -ldflags '-X version.GitCommit=$(EVE_TREE_TAG)' -o /go/bin/linuxkit \
-                          ./vendor/github.com/linuxkit/linuxkit/src/cmd/linuxkit" $(dir $<) /linuxkit $(dir $@)
-$(CURDIR)/build-tools/bin/manifest-tool: $(CURDIR)/build-tools/src/manifest-tool/Gopkg.lock | $(GOBUILDER)
-	@$(DOCKER_GO) "unset GOFLAGS ; unset GO111MODULE ; go build -ldflags '-X main.gitCommit=$(EVE_TREE_TAG)' -o /go/bin/manifest-tool \
-                          ./vendor/github.com/estesp/manifest-tool" $(dir $<) /manifest-tool $(dir $@)
+$(LINUXKIT): $(GOBUILDER)
+	@$(DOCKER_GO) "unset GOFLAGS; rm -rf /tmp/linuxkit && mkdir -p /tmp/linuxkit && cd /tmp/linuxkit && GO111MODULE=on CGO_ENABLED=0 go get $(LINUXKIT_SOURCE) \
+	&& cd - && rm -rf /tmp/linuxkit" $(GOTREE) $(GOMODULE) $(BUILDTOOLS_BIN)
+	# it might have built cross-arch, so would need to move it
+	if [ -e $(BUILDTOOLS_BIN)/$(GOOS)_*/linuxkit ]; then mv $(BUILDTOOLS_BIN)/*/linuxkit $@; fi
 
 $(GOBUILDER):
 ifneq ($(BUILD),local)
@@ -567,8 +571,8 @@ $(ROOTFS_FULL_NAME)-kvm-adam-$(ZARCH).$(ROOTFS_FORMAT): images/rootfs-%.yml $(SS
 $(ROOTFS_FULL_NAME)-%-$(ZARCH).$(ROOTFS_FORMAT): images/rootfs-%.yml | $(INSTALLER)
 	./tools/makerootfs.sh $< $@ $(ROOTFS_FORMAT)
 	@echo "size of $@ is $$(wc -c < "$@")B"
-	@[ $$(wc -c < "$@") -gt $$(( 250 * 1024 * 1024 )) ] && \
-          echo "ERROR: size of $@ is greater than 250MB (bigger than allocated partition)" && exit 1 || :
+	@[ $$(wc -c < "$@") -gt $$(( ${ROOTFS_SIZE_MB} * 1024 * 1024 )) ] && \
+          echo "ERROR: size of $@ is greater than ${ROOTFS_SIZE_MB} (bigger than the allocated partition)" && exit 1 || :
 
 %-show-tag:
 	@$(LINUXKIT) pkg show-tag pkg/$*
@@ -612,7 +616,7 @@ help:
 	@echo "   yetus          run Apache Yetus to check the quality of the source tree"
 	@echo
 	@echo "Commonly used build targets:"
-	@echo "   build-tools    builds linuxkit and manifest-tool utilities under build-tools/bin"
+	@echo "   build-tools    builds linuxkit utilities and installs under build-tools/bin"
 	@echo "   config         builds a bundle with initial EVE configs"
 	@echo "   pkgs           builds all EVE packages"
 	@echo "   pkg/XXX        builds XXX EVE package"

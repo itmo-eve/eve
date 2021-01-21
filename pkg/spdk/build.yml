@@ -1,0 +1,17 @@
+image: eve-spdk
+org: lfedge
+network: yes
+config:
+  binds:
+    - /dev:/dev
+    - /dev/pts:/dev/pts
+    - /run:/run
+    - /config:/config
+    - /persist:/persist
+    - /lib/modules:/lib/modules
+    - /:/hostfs
+  net: host
+  capabilities:
+    - all
+  pid: host
+  userns: host
