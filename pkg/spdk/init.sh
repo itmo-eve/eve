@@ -5,6 +5,8 @@ mount -t tmpfs tmpfs /dev/shm
 
 mkdir -p /var/tmp/
 
+echo 1 > /sys/module/vfio/parameters/enable_unsafe_noiommu_mode
+
 #Launch the SPDK target
 HUGEMEM=256 /usr/share/spdk/scripts/setup.sh
 
