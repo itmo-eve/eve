@@ -35,7 +35,7 @@ var (
 	smartData = types.NewSmartDataWithDefaults()
 )
 
-func deviceInfoTask(ctxPtr *zedagentContext, triggerDeviceInfo <-chan struct{}) {
+func reportInfoTask(ctxPtr *zedagentContext, triggerInfo <-chan infoForObjectKey) {
 	wdName := agentName + "devinfo"
 
 	// Run a periodic timer so we always update StillRunning
@@ -45,14 +45,77 @@ func deviceInfoTask(ctxPtr *zedagentContext, triggerDeviceInfo <-chan struct{}) 
 
 	for {
 		select {
-		case <-triggerDeviceInfo:
+		case infoForKeyMessage := <-triggerInfo:
+			infoType := infoForKeyMessage.infoType
+			log.Functionf("reportInfoTask got message for %s", infoType.String())
 			start := time.Now()
-			log.Function("deviceInfoTask got message")
-
-			PublishDeviceInfoToZedCloud(ctxPtr)
-			ctxPtr.iteration++
-			log.Function("deviceInfoTask done with message")
-			ctxPtr.ps.CheckMaxTimeTopic(wdName, "PublishDeviceInfo", start,
+			switch infoType {
+			case info.ZInfoTypes_ZiDevice:
+				PublishDeviceInfoToZedCloud(ctxPtr)
+				ctxPtr.iteration++
+			case info.ZInfoTypes_ZiApp:
+				// publish application info
+				sub := ctxPtr.getconfigCtx.subAppInstanceStatus
+				if c, err := sub.Get(infoForKeyMessage.objectKey); err == nil {
+					appStatus := c.(types.AppInstanceStatus)
+					uuidStr := appStatus.Key()
+					PublishAppInfoToZedCloud(ctxPtr, uuidStr, &appStatus, ctxPtr.assignableAdapters,
+						ctxPtr.iteration)
+					ctxPtr.iteration++
+				} else {
+					log.Functionf("reportInfoTask not found %s for key %s: %s",
+						infoType.String(), infoForKeyMessage.objectKey, err)
+				}
+			case info.ZInfoTypes_ZiNetworkInstance:
+				// publish network instance info
+				sub := ctxPtr.subNetworkInstanceStatus
+				if c, err := sub.Get(infoForKeyMessage.objectKey); err == nil {
+					niStatus := c.(types.NetworkInstanceStatus)
+					prepareAndPublishNetworkInstanceInfoMsg(ctxPtr, niStatus, false)
+					ctxPtr.iteration++
+				} else {
+					log.Functionf("reportInfoTask not found %s for key %s: %s",
+						infoType.String(), infoForKeyMessage.objectKey, err)
+				}
+			case info.ZInfoTypes_ZiVolume:
+				// publish volume info
+				sub := ctxPtr.getconfigCtx.subVolumeStatus
+				if c, err := sub.Get(infoForKeyMessage.objectKey); err == nil {
+					volumeStatus := c.(types.VolumeStatus)
+					uuidStr := volumeStatus.VolumeID.String()
+					PublishVolumeToZedCloud(ctxPtr, uuidStr, &volumeStatus, ctxPtr.iteration)
+					ctxPtr.iteration++
+				} else {
+					log.Functionf("reportInfoTask not found %s for key %s: %s",
+						infoType.String(), infoForKeyMessage.objectKey, err)
+				}
+			case info.ZInfoTypes_ZiContentTree:
+				// publish content tree info
+				sub := ctxPtr.getconfigCtx.subContentTreeStatus
+				if c, err := sub.Get(infoForKeyMessage.objectKey); err == nil {
+					ctStatus := c.(types.ContentTreeStatus)
+					uuidStr := ctStatus.Key()
+					PublishContentInfoToZedCloud(ctxPtr, uuidStr, &ctStatus, ctxPtr.iteration)
+					ctxPtr.iteration++
+				} else {
+					log.Functionf("reportInfoTask not found %s for key %s: %s",
+						infoType.String(), infoForKeyMessage.objectKey, err)
+				}
+			case info.ZInfoTypes_ZiBlobList:
+				// publish blob info
+				sub := ctxPtr.subBlobStatus
+				if c, err := sub.Get(infoForKeyMessage.objectKey); err == nil {
+					blobStatus := c.(types.BlobStatus)
+					uuidStr := blobStatus.Key()
+					PublishBlobInfoToZedCloud(ctxPtr, uuidStr, &blobStatus, ctxPtr.iteration)
+					ctxPtr.iteration++
+				} else {
+					log.Functionf("reportInfoTask not found %s for key %s: %s",
+						infoType.String(), infoForKeyMessage.objectKey, err)
+				}
+			}
+			log.Function("reportInfoTask done with message")
+			ctxPtr.ps.CheckMaxTimeTopic(wdName, "PublishInfo", start,
 				warningTime, errorTime)
 		case <-stillRunning.C:
 		}
