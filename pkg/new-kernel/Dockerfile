@@ -43,29 +43,15 @@ ARG KERNEL_PGP2_SIGN
 
 # The only variable that is used everywhere is KERNEL_SERIES, so we stick it into env
 SHELL ["/bin/sh", "-c", "export KERNEL_SERIES=$(eval echo \\$KERNEL_VERSION_$(uname -m) | sed -e 's#.[^.]*$#.x#') ; /bin/sh -c \"$1\"", "-" ]
+RUN mkdir /linux && cd /linux && git init && git remote add origin https://github.com/raspberrypi/linux && \
+    git fetch --depth 1 origin 6af8ae321a801a4e20183454c65eb0d23069d8ac && git checkout FETCH_HEAD && \
+    KERNEL_SOURCE=${KERNEL_SOURCE:-https://github.com/raspberrypi/linux/tree/rpi-5.10.y} && \
+    mkdir /out && echo "KERNEL_SOURCE=${KERNEL_SOURCE}" > /out/kernel-source-info
 
 # We copy the entire directory. This copies some unneeded files, but
 # allows us to check for the existence /patches-${KERNEL_SERIES} to
 # build kernels without patches.
 COPY / /
-
-# Download and verify kernel
-# PGP keys: 589DA6B1 (greg@kroah.com) & 6092693E (autosigner@kernel.org) & 00411886 (torvalds@linux-foundation.org)
-RUN KERNEL_VERSION="$(eval echo \$KERNEL_VERSION_"$(uname -m)")" && KERNEL_MAJOR="$(echo "$KERNEL_VERSION" | cut -f1 -d.)" && \
-    KERNEL_SOURCE=${KERNEL_SOURCE:-https://www.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR}.x/linux-${KERNEL_VERSION}.tar.xz} && \
-    KERNEL_SHA256_SUMS=${KERNEL_SHA256_SUMS:-https://www.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR}.x/sha256sums.asc} && \
-    KERNEL_PGP2_SIGN=${KERNEL_PGP2_SIGN:-https://www.kernel.org/pub/linux/kernel/v${KERNEL_MAJOR}.x/linux-${KERNEL_VERSION}.tar.sign} && \
-    curl -fsSLO ${KERNEL_SHA256_SUMS} && \
-    gpg2 -q --import keys.asc && \
-    gpg2 --verify sha256sums.asc && \
-    KERNEL_SHA256=$(grep linux-${KERNEL_VERSION}.tar.xz sha256sums.asc | cut -d ' ' -f 1) && \
-    [ -f linux-${KERNEL_VERSION}.tar.xz ] || curl -fsSLO ${KERNEL_SOURCE} && \
-    echo "${KERNEL_SHA256}  linux-${KERNEL_VERSION}.tar.xz" | sha256sum -c - && \
-    xz -d linux-${KERNEL_VERSION}.tar.xz && \
-    curl -fsSLO ${KERNEL_PGP2_SIGN} && \
-    gpg2 --verify linux-${KERNEL_VERSION}.tar.sign linux-${KERNEL_VERSION}.tar && \
-    cat linux-${KERNEL_VERSION}.tar | tar --absolute-names -x && mv /linux-${KERNEL_VERSION} /linux && \
-    mkdir /out && echo "KERNEL_SOURCE=${KERNEL_SOURCE}" > /out/kernel-source-info
 
 # Apply local patches
 WORKDIR /linux
