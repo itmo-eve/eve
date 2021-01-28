@@ -1,0 +1,29 @@
+diff --git a/tools/libxl/libxl_internal.h b/tools/libxl/libxl_internal.h
+index 94a23179d3..61f6018a6b 100644
+--- a/tools/libxl/libxl_internal.h
++++ b/tools/libxl/libxl_internal.h
+@@ -93,17 +93,17 @@
+ #include "_libxl_types_internal.h"
+ #include "_libxl_types_internal_json.h"
+ 
+-#define LIBXL_INIT_TIMEOUT 10
+-#define LIBXL_DESTROY_TIMEOUT 10
+-#define LIBXL_HOTPLUG_TIMEOUT 40
++#define LIBXL_INIT_TIMEOUT 100
++#define LIBXL_DESTROY_TIMEOUT 100
++#define LIBXL_HOTPLUG_TIMEOUT 400
+ /* QEMU may be slow to load and start due to a bug in Linux where the I/O
+  * subsystem sometime produce high latency under load. */
+-#define LIBXL_DEVICE_MODEL_START_TIMEOUT 60
++#define LIBXL_DEVICE_MODEL_START_TIMEOUT 600
+ #define LIBXL_DEVICE_MODEL_SAVE_FILE XEN_LIB_DIR "/qemu-save" /* .$domid */
+ #define LIBXL_DEVICE_MODEL_RESTORE_FILE XEN_LIB_DIR "/qemu-resume" /* .$domid */
+-#define LIBXL_QMP_CMD_TIMEOUT 10
+-#define LIBXL_STUBDOM_START_TIMEOUT 30
+-#define LIBXL_QEMU_BODGE_TIMEOUT 2
++#define LIBXL_QMP_CMD_TIMEOUT 100
++#define LIBXL_STUBDOM_START_TIMEOUT 300
++#define LIBXL_QEMU_BODGE_TIMEOUT 20
+ #define LIBXL_XENCONSOLE_LIMIT 1048576
+ #define LIBXL_XENCONSOLE_PROTOCOL "vt100"
+ #define LIBXL_MAXMEM_CONSTANT 1024
