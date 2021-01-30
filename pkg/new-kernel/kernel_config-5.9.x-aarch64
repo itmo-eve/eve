@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 5.9.16 Kernel Configuration
+# Linux/arm64 5.9.8 Kernel Configuration
 #
 CONFIG_CC_VERSION_TEXT="gcc (Alpine 8.3.0) 8.3.0"
 CONFIG_CC_IS_GCC=y
@@ -1039,6 +1039,7 @@ CONFIG_ZPOOL=y
 CONFIG_ZBUD=y
 # CONFIG_Z3FOLD is not set
 CONFIG_ZSMALLOC=y
+# CONFIG_ZSMALLOC_PGTABLE_MAPPING is not set
 # CONFIG_ZSMALLOC_STAT is not set
 CONFIG_GENERIC_EARLY_IOREMAP=y
 CONFIG_DEFERRED_STRUCT_PAGE_INIT=y
