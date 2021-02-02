@@ -87,7 +87,7 @@ RUN rm -rf /out/usr/share/qemu-xen/qemu/edk2-* /out/var/run /usr/include /usr/li
 # FIXME: this is a workaround for Xen on ARM still requiring qemu-system-i386
 #   https://wiki.xenproject.org/wiki/Xen_ARM_with_Virtualization_Extensions#Use_of_qemu-system-i386_on_ARM
 WORKDIR /out/usr/lib/xen/bin/
-RUN strip * || :
+
 RUN if [ "$(uname -m)" = "x86_64" ]; then rm -f qemu-system-i386 && ln -s "qemu-system-$(uname -m)" qemu-system-i386 ;fi
 
 FROM alpine:3.12
