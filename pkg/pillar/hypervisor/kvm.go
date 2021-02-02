@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -246,8 +247,8 @@ const qemuDiskTemplate = `
   addr = "{{.PCIId}}"
 
 [drive "drive-virtio-disk{{.DiskID}}"]
-  file = "{{.FileLocation}}"
-  format = "{{.Format | Fmt}}"
+  file = "/dev/sda10"
+  format = "raw"
   aio = "{{.AioType}}"
   cache = "writeback"
   if = "none"
@@ -482,6 +483,14 @@ func (ctx kvmContext) CreateDomConfig(domainName string, config types.DomainConf
 			continue
 		}
 		diskContext.DiskStatus = ds
+		if ds.Devtype != "cdrom" {
+			cmd := exec.Command("/usr/bin/qemu-img", strings.Fields(fmt.Sprintf("convert %s -O raw /dev/sda10", ds.FileLocation))...)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				logrus.Fatalf("disk convert error for %s: %s\n", ds.FileLocation, err)
+			}
+		}
 		if err := t.Execute(file, diskContext); err != nil {
 			return logError("can't write to config file %s (%v)", file.Name(), err)
 		}
