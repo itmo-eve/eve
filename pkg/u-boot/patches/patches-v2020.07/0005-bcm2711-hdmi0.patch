@@ -1,0 +1,12 @@
+diff --git a/drivers/video/bcm2835.c b/drivers/video/bcm2835.c
+index 9326999cd36d23d916d56a380bbcc9a59e669b15..c2962932c97f991d24239a07374aca07b69846b9 100644
+--- a/drivers/video/bcm2835.c
++++ b/drivers/video/bcm2835.c
+@@ -52,6 +52,7 @@ static int bcm2835_video_probe(struct udevice *dev)
+ 
+ static const struct udevice_id bcm2835_video_ids[] = {
+ 	{ .compatible = "brcm,bcm2835-hdmi" },
++	{ .compatible = "brcm,bcm2711-hdmi0" },
+ 	{ .compatible = "brcm,bcm2708-fb" },
+ 	{ }
+ };
