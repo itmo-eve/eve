@@ -16,9 +16,10 @@ RUN apk add --no-cache     \
     flex=2.6.4-r1          \
     openssl-dev=1.1.1b-r1  \
     python3                \
-    swig
+    swig                   \
+    git
 
-RUN curl -fsSL ${SOURCE_URL} | tar -C / -xzf - && mv /u-boot* /u-boot
+RUN git clone --single-branch --branch rpi-next-staging --depth=1 https://gitlab.denx.de/u-boot/custodians/u-boot-raspberrypi.git /u-boot
 
 WORKDIR /u-boot
 # FIXME: we need to get to the bottom of this weird workaround on x86/Alpine
