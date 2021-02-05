@@ -67,20 +67,31 @@ if [ -n "$IMGA" ] && [ -z "$P3" ] && [ -z "$IMGB" ]; then
    # now that GPT itself is fixed, lets add IMGB & P3 partitions
    IMGA_ID=$(sgdisk -p "$DEV" | grep "IMGA$" | awk '{print $1;}')
    IMGB_ID=$((IMGA_ID + 1))
-   P3_ID=$((IMGA_ID + 7))
+   SWAP_ID=$((IMGA_ID + 7))
+   P3_ID=$((SWAP_ID + 1))
 
    IMGA_SIZE=$(sgdisk -i "$IMGA_ID" "$DEV" | awk '/^Partition size:/ { print $3; }')
    IMGA_GUID=$(sgdisk -i "$IMGA_ID" "$DEV" | awk '/^Partition GUID code:/ { print $4; }')
 
+   SWAP_SIZE=$((IMGA_SIZE * 2))
+
    SEC_START=$(sgdisk -f "$DEV")
    SEC_END=$((SEC_START + IMGA_SIZE))
+   SWAP_START=$((SEC_END + 1))
+   SWAP_END=$((SWAP_START + SWAP_SIZE))
 
    sgdisk --new "$IMGB_ID:$SEC_START:$SEC_END" --typecode="$IMGB_ID:$IMGA_GUID" --change-name="$IMGB_ID:IMGB" "$DEV"
+   sgdisk --new "$SWAP_ID:$SWAP_START:$SWAP_END" --typecode="$SWAP_ID:5f24425a-2dfa-11e8-a270-7b663faccc20" --change-name="$SWAP_ID:SWAP" "$DEV"
    sgdisk --largest-new="$P3_ID" --typecode="$P3_ID:5f24425a-2dfa-11e8-a270-7b663faccc2c" --change-name="$P3_ID:P3" "$DEV"
 
    # focrce kernel to re-scan partition table
    partprobe "$DEV"
    partx -a --nr "$IMGB_ID:$P3_ID" "$DEV"
+fi
+
+if SWAP=$(findfs PARTLABEL=SWAP) && [ -n "$SWAP" ]; then
+   mkswap -c "$SWAP"
+   swapon "$SWAP"
 fi
 
 # We support P3 partition either formatted as ext3/4 or as part of ZFS pool
