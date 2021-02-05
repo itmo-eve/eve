@@ -239,6 +239,12 @@ endif
 # since they are not getting published in Docker HUB
 PKGS=$(shell ls -d pkg/* | grep -Ev "eve|test-microsvcs")
 
+PKG_DOCKERFILES=$(shell ls -d pkg/*/Dockerfile | grep -Ev "eve|test-microsvcs")
+
+# Preload images from FROM fields of Dockerfiles to reduce requests to docker
+docker-images-preload:
+	@cat $(PKG_DOCKERFILES) | grep FROM | grep -Ev "$|{|}|scratch" | sed -En "s/FROM\s*([0-9a-zA-Z:\./-]+).*/\1/p" | uniq | xargs -n 1 docker pull
+
 # Top-level targets
 
 all: help
