@@ -21,7 +21,7 @@ func TargetCreate(status types.VolumeStatus) error {
 	}
 
 	var controlPath = filepath.Join(targetRoot, "control")
-	var data = fmt.Sprintf("fd_dev_name=%s,fd_dev_size=%d,fd_buffered_io=1", status.PathName(), status.MaxVolSize)
+	var data = fmt.Sprintf("fd_dev_name=%s,fd_dev_size=%d,fd_buffered_io=1", "/dev/mapper/thin-volume", 1953125)
 	if err := ioutil.WriteFile(controlPath, []byte(data), 0660); err != nil {
 		return fmt.Errorf("Error set control: %v", err)
 	}
@@ -37,7 +37,7 @@ func TargetCreate(status types.VolumeStatus) error {
 	}
 
 	var udevPath = filepath.Join(targetRoot, "udev_path")
-	if err := ioutil.WriteFile(udevPath, []byte(status.PathName()), 0660); err != nil {
+	if err := ioutil.WriteFile(udevPath, []byte("/dev/mapper/thin-volume"), 0660); err != nil {
 		return fmt.Errorf("Error set udev_path for target %v", err)
 	}
 

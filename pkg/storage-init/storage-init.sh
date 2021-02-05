@@ -68,19 +68,24 @@ if [ -n "$IMGA" ] && [ -z "$P3" ] && [ -z "$IMGB" ]; then
    IMGA_ID=$(sgdisk -p "$DEV" | grep "IMGA$" | awk '{print $1;}')
    IMGB_ID=$((IMGA_ID + 1))
    P3_ID=$((IMGA_ID + 7))
+   P4_ID=$((P3_ID + 1))
 
    IMGA_SIZE=$(sgdisk -i "$IMGA_ID" "$DEV" | awk '/^Partition size:/ { print $3; }')
    IMGA_GUID=$(sgdisk -i "$IMGA_ID" "$DEV" | awk '/^Partition GUID code:/ { print $4; }')
 
    SEC_START=$(sgdisk -f "$DEV")
    SEC_END=$((SEC_START + IMGA_SIZE))
+   DEVICE_SIZE=$(cat "/sys/class/block/${DEV#/dev/}/size")
+   P3_START=$((SEC_END + 1))
+   P3_END=$((DEVICE_SIZE / 2))
 
    sgdisk --new "$IMGB_ID:$SEC_START:$SEC_END" --typecode="$IMGB_ID:$IMGA_GUID" --change-name="$IMGB_ID:IMGB" "$DEV"
-   sgdisk --largest-new="$P3_ID" --typecode="$P3_ID:5f24425a-2dfa-11e8-a270-7b663faccc2c" --change-name="$P3_ID:P3" "$DEV"
+   sgdisk --new "$P3_ID:$P3_START:$P3_END" --typecode="$P3_ID:5f24425a-2dfa-11e8-a270-7b663faccc2c" --change-name="$P3_ID:P3" "$DEV"
+   sgdisk --largest-new="$P4_ID" --typecode="$P4_ID:5f24425a-2dfa-11e8-a270-7b663faccc2d" --change-name="$P4_ID:P4" "$DEV"
 
    # focrce kernel to re-scan partition table
    partprobe "$DEV"
-   partx -a --nr "$IMGB_ID:$P3_ID" "$DEV"
+   partx -a --nr "$IMGB_ID:$P4_ID" "$DEV"
 fi
 
 # We support P3 partition either formatted as ext3/4 or as part of ZFS pool
