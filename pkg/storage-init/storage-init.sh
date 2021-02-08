@@ -88,6 +88,7 @@ if [ -n "$IMGA" ] && [ -z "$P3" ] && [ -z "$IMGB" ]; then
    partx -a --nr "$IMGB_ID:$P4_ID" "$DEV"
 fi
 
+
 # We support P3 partition either formatted as ext3/4 or as part of ZFS pool
 # Priorities are: ext3, ext4, zfs
 if P3=$(findfs PARTLABEL=P3) && [ -n "$P3" ]; then
@@ -161,6 +162,14 @@ done
 
 #Recording SMART details to a file
 smartctl -a "$(grep -m 1 /persist < /proc/mounts | cut -d ' ' -f 1)" --json > $SMART_DETAILS_FILE
+
+
+# Setting up a device-mapping
+dmsetup create vhost-thin-metadata --table '0 8192 linear /dev/sda10 0'
+dmsetup create vhost-thin-data --table '0 1961317 linear /dev/sda10 4096'
+dmsetup create test-thin-pool --table '0 1953125 thin-pool /dev/mapper/vhost-thin-metadata  /dev/mapper/vhost-thin-data 128 0'
+dmsetup message /dev/mapper/test-thin-pool 0 "create_thin 17"
+dmsetup create thin-volume --table '0 1171875 thin /dev/mapper/test-thin-pool 17'
 
 # Uncomment the following block if you want storage-init to replace
 # rootfs of service containers with a copy under /persist/services/X
