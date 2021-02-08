@@ -68,19 +68,24 @@ if [ -n "$IMGA" ] && [ -z "$P3" ] && [ -z "$IMGB" ]; then
    IMGA_ID=$(sgdisk -p "$DEV" | grep "IMGA$" | awk '{print $1;}')
    IMGB_ID=$((IMGA_ID + 1))
    P3_ID=$((IMGA_ID + 7))
+   P4_ID=$((P3_ID + 1))
 
    IMGA_SIZE=$(sgdisk -i "$IMGA_ID" "$DEV" | awk '/^Partition size:/ { print $3; }')
    IMGA_GUID=$(sgdisk -i "$IMGA_ID" "$DEV" | awk '/^Partition GUID code:/ { print $4; }')
 
    SEC_START=$(sgdisk -f "$DEV")
    SEC_END=$((SEC_START + IMGA_SIZE))
+   DEVICE_SIZE=$(cat "/sys/class/block/${DEV#/dev/}/size")
+   P3_START=$((SEC_END + 1))
+   P3_END=$((DEVICE_SIZE / 2))
 
    sgdisk --new "$IMGB_ID:$SEC_START:$SEC_END" --typecode="$IMGB_ID:$IMGA_GUID" --change-name="$IMGB_ID:IMGB" "$DEV"
-   sgdisk --largest-new="$P3_ID" --typecode="$P3_ID:5f24425a-2dfa-11e8-a270-7b663faccc2c" --change-name="$P3_ID:P3" "$DEV"
+   sgdisk --new "$P3_ID:$P3_START:$P3_END" --typecode="$P3_ID:5f24425a-2dfa-11e8-a270-7b663faccc2c" --change-name="$P3_ID:P3" "$DEV"
+   sgdisk --largest-new="$P4_ID" --typecode="$P4_ID:5f24425a-2dfa-11e8-a270-7b663faccc2d" --change-name="$P4_ID:P4" "$DEV"
 
    # focrce kernel to re-scan partition table
    partprobe "$DEV"
-   partx -a --nr "$IMGB_ID:$P3_ID" "$DEV"
+   partx -a --nr "$IMGB_ID:$P4_ID" "$DEV"
 fi
 
 # We support P3 partition either formatted as ext3/4 or as part of ZFS pool
@@ -156,6 +161,13 @@ done
 
 #Recording SMART details to a file
 smartctl -a "$(grep -m 1 /persist < /proc/mounts | cut -d ' ' -f 1)" --json > $SMART_DETAILS_FILE
+
+# Setting up a device-mapping
+dmsetup create vhost-thin-metadata --table '0 8192 linear /dev/sda10 0'
+dmsetup create vhost-thin-data --table '0 1961317 linear /dev/sda10 4096'
+dmsetup create test-thin-pool --table '0 1953125 thin-pool /dev/mapper/vhost-thin-metadata  /dev/mapper/vhost-thin-data 128 0'
+dmsetup message /dev/mapper/test-thin-pool 0 "create_thin 17"
+dmsetup create thin-volume --table '0 1171875 thin /dev/mapper/test-thin-pool 17'
 
 # Uncomment the following block if you want storage-init to replace
 # rootfs of service containers with a copy under /persist/services/X

@@ -88,7 +88,7 @@ func createVdiskVolume(ctx *volumemgrContext, status types.VolumeStatus,
 
 	log.Functionf("createVdiskVolume(%s) DONE", status.Key())
 
-	if err := TargetCreate(status); err != nil {
+	if err := TargetBlockCreate(status); err != nil {
 		log.Error(err)
 	}
 
