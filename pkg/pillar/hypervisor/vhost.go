@@ -22,7 +22,7 @@ func VhostCreate(status types.DiskStatus) (string, error) {
 	var wwn = x.DeviceWWN()
 	var wwnNexus = x.NexusWWN()
 
-	var targetRoot = filepath.Join("/hostfs/sys/kernel/config/target/core/fileio_0", status.DisplayName)
+	var targetRoot = filepath.Join("/hostfs/sys/kernel/config/target/core/iblock_0", status.DisplayName)
 	var vhostRoot = filepath.Join("/hostfs/sys/kernel/config/target/vhost", wwn, "tpgt_1")
 	var vhostLun = filepath.Join(vhostRoot, "/lun/lun_0")
 	if err := os.MkdirAll(vhostLun, 0755); err != nil {

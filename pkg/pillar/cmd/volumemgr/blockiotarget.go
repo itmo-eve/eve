@@ -21,7 +21,7 @@ func TargetBlockCreate(status types.VolumeStatus) error {
 	}
 
 	var controlPath = filepath.Join(targetRoot, "control")
-	var data = fmt.Sprintf("dev=/dev/mapper/thin-volume,udev_path=/dev/mapper/thin-volume,readonly=0,wwn=%s",  status.VolumeID.String())
+	var data = fmt.Sprintf("dev=/dev/mapper/thin-volume,udev_path=/dev/mapper/thin-volume,readonly=0")
 	if err := ioutil.WriteFile(controlPath, []byte(data), 0660); err != nil {
 		return fmt.Errorf("Error set control: %v", err)
 	}
