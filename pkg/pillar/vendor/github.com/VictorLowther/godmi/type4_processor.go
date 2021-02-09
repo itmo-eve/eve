@@ -25,15 +25,14 @@ const (
 )
 
 func (p ProcessorType) String() string {
-	types := [...]string{
+	return safeLookup(byte(p)-1,
 		"Other",
 		"Unknown",
 		"CentralProcessor",
 		"MathProcessor",
 		"DSPProcessor",
 		"VideoProcessor",
-	}
-	return types[p-1]
+	)
 }
 
 func (p ProcessorType) MarshalText() ([]byte, error) {
@@ -557,6 +556,12 @@ func (p ProcessorFamily) String() string {
 
 type ProcessorID uint64
 
+func (pid ProcessorID) String() string {
+	p := u64Tobytes(uint64(pid))
+	return fmt.Sprintf("%02X %02X %02X %02X %02X %02X %02X %02X",
+		p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7])
+}
+
 type ProcessorVoltage byte
 
 const (
@@ -853,7 +858,7 @@ func (p ProcessorInformation) String() string {
 		"\tProcessor Type: %s\n"+
 		"\tFamily: %s\n"+
 		"\tManufacturer: %s\n"+
-		"\tID: %x\n"+
+		"\tID: %s\n"+
 		"\tVersion: %s\n"+
 		"\tVoltage: %s\n"+
 		"\tExternal Clock: %d MHz\n"+
@@ -896,7 +901,7 @@ func (p ProcessorInformation) String() string {
 }
 
 func newProcessorInformation(h dmiHeader) dmiTyper {
-	data := h.data
+	data := h.data()
 	pi := &ProcessorInformation{
 		SocketDesignation: h.FieldString(int(data[0x04])),
 		ProcessorType:     ProcessorType(data[0x05]),

@@ -14,7 +14,7 @@ import (
 type PortableBatteryDeviceChemistry byte
 
 func (p PortableBatteryDeviceChemistry) String() string {
-	chems := [...]string{
+	return safeLookup(byte(p)-1,
 		"Other",
 		"Unknown(see SBDS Device Chemistry)",
 		"Lead Acid",
@@ -23,8 +23,7 @@ func (p PortableBatteryDeviceChemistry) String() string {
 		"Lithium-ion",
 		"Zinc air",
 		"Lithium Polymer",
-	}
-	return chems[p-1]
+	)
 }
 
 type SBDSManufactureDateType uint16
@@ -130,7 +129,7 @@ func (p PortableBattery) String() string {
 }
 
 func newPortableBattery(h dmiHeader) dmiTyper {
-	data := h.data
+	data := h.data()
 	pi := &PortableBattery{
 		Location:                  h.FieldString(int(data[0x04])),
 		Manufacturer:              h.FieldString(int(data[0x05])),

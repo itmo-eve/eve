@@ -1,6 +1,9 @@
 package dmi
 
-import "github.com/VictorLowther/godmi"
+import (
+	"github.com/VictorLowther/godmi"
+	"strings"
+)
 
 type Processors struct {
 	TotalCoreCount   uint32
@@ -21,13 +24,43 @@ type Memory struct {
 type Info struct {
 	BIOS       *godmi.BIOSInformation
 	System     *godmi.SystemInformation
+	Baseboards []*godmi.BaseboardInformation
 	Chassis    []*godmi.ChassisInformation
 	Processors Processors
 	Memory     Memory
+	Hypervisor string
 }
 
 func (i *Info) Class() string {
 	return "DMI"
+}
+
+func DetectVirtType(dmiinfo *Info) (string, bool) {
+	keys := []string{dmiinfo.System.ProductName, dmiinfo.System.Manufacturer}
+	for _, v := range dmiinfo.Baseboards {
+		keys = append(keys, v.Manufacturer)
+	}
+	keys = append(keys, dmiinfo.BIOS.Vendor)
+	vendors := [][2]string{
+		{"KVM", "KVM"},
+		{"QEMU", "QEMU"},
+		{"VMware", "VMware"},
+		{"VMW", "VMware"},
+		{"innotek GmbH", "VirtualBox"},
+		{"Oracle Corporation", "VirtualBox"},
+		{"Xen", "Xen"},
+		{"Bochs", "Bochs"},
+		{"Parallels", "Parallels"},
+		{"BHYVE", "BHYVE"},
+	}
+	for _, key := range keys {
+		for _, vendor := range vendors {
+			if strings.HasPrefix(key, vendor[0]) {
+				return vendor[1], true
+			}
+		}
+	}
+	return "", false
 }
 
 func Gather() (res *Info, err error) {
@@ -53,6 +86,7 @@ func Gather() (res *Info, err error) {
 	if len(godmi.SystemInformations) == 1 {
 		res.System = godmi.SystemInformations[0]
 	}
+	res.Baseboards = godmi.BaseboardInformations
 	res.Chassis = godmi.ChassisInformations
 	res.Processors.Items = godmi.ProcessorInformations
 	for _, proc := range res.Processors.Items {
@@ -72,5 +106,6 @@ func Gather() (res *Info, err error) {
 			res.Memory.PopulatedSlots += 1
 		}
 	}
+	res.Hypervisor,_ = DetectVirtType(res)
 	return
 }

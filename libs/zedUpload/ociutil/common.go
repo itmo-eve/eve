@@ -61,27 +61,12 @@ func manifestsDescImg(image string, options []remote.Option) (name.Reference, *r
 		return ref, desc, img, manifestDirect, manifestResolved, size, fmt.Errorf("error getting resolved manifest bytes: %v", err)
 	}
 
-	// we now get the actual manifest, to get the layers and resolve the size
-	manifest, err := img.Manifest()
+	// calculate size of image
+	size, err = v1tarball.CalculateSize(map[name.Reference]v1.Image{
+		ref: img,
+	})
 	if err != nil {
-		return ref, desc, img, manifestDirect, manifestResolved, size, fmt.Errorf("error getting resolved manifest object: %v", err)
-	}
-
-	// size starts at the default of 0
-	// add the size of the config
-	size += v1tarball.CalculateTarFileSize(manifest.Config.Size)
-
-	// next the layers and their sizes, along with filenames for the manifest
-	imgLayers, err := img.Layers()
-	if err != nil {
-		return ref, desc, img, manifestDirect, manifestResolved, size, fmt.Errorf("error getting layers of image: %v", err)
-	}
-	for _, layer := range imgLayers {
-		layerSize, err := layer.Size()
-		if err != nil {
-			return ref, desc, img, manifestDirect, manifestResolved, size, fmt.Errorf("error getting size of layers: %v", err)
-		}
-		size += v1tarball.CalculateTarFileSize(layerSize)
+		return ref, desc, img, manifestDirect, manifestResolved, size, fmt.Errorf("error getting size: %v", err)
 	}
 
 	// get our manifestFile that will be added, convert to bytes, get size
@@ -91,11 +76,10 @@ func manifestsDescImg(image string, options []remote.Option) (name.Reference, *r
 	if err != nil {
 		return ref, desc, img, manifestDirect, manifestResolved, size, fmt.Errorf("error getting tar manifest file: %v", err)
 	}
-	manifestFileBytes, err := json.Marshal(manifestFile)
+	_, err = json.Marshal(manifestFile)
 	if err != nil {
 		return ref, desc, img, manifestDirect, manifestResolved, size, fmt.Errorf("error converting tar manifest file to json: %v", err)
 	}
-	size += v1tarball.CalculateTarFileSize(int64(len(manifestFileBytes)))
 
 	return ref, desc, img, manifestDirect, manifestResolved, size, nil
 }

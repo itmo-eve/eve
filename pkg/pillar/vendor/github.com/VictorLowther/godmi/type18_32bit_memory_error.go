@@ -14,7 +14,7 @@ import (
 type MemoryErrorInformationType byte
 
 func (m MemoryErrorInformationType) String() string {
-	types := [...]string{
+	return safeLookup(byte(m)-1,
 		"Other",
 		"Unknown",
 		"OK",
@@ -29,33 +29,30 @@ func (m MemoryErrorInformationType) String() string {
 		"Corrected single-bit error",
 		"Corrected error",
 		"Uncorrectable error",
-	}
-	return types[m-1]
+	)
 }
 
 type MemoryErrorInformationGranularity byte
 
 func (m MemoryErrorInformationGranularity) String() string {
-	grans := [...]string{
+	return safeLookup(byte(m)-1,
 		"Other",
 		"Unknown",
 		"Device level",
 		"Memory partition level",
-	}
-	return grans[m-1]
+	)
 }
 
 type MemoryErrorInformationOperation byte
 
 func (m MemoryErrorInformationOperation) String() string {
-	operations := [...]string{
+	return safeLookup(byte(m)-1,
 		"Other",
 		"Unknown",
 		"Read",
 		"Write",
 		"Partial write",
-	}
-	return operations[m-1]
+	)
 }
 
 type VendorSyndromeType uint32
@@ -125,7 +122,7 @@ func (m _32BitMemoryErrorInformation) String() string {
 }
 
 func new_32BitMemoryErrorInformation(h dmiHeader) dmiTyper {
-	data := h.data
+	data := h.data()
 	bi := &_32BitMemoryErrorInformation{
 		Type:              MemoryErrorInformationType(data[0x04]),
 		Granularity:       MemoryErrorInformationGranularity(data[0x05]),

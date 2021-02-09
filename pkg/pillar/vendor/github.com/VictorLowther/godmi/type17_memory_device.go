@@ -15,7 +15,7 @@ import (
 type MemoryDeviceFormFactor byte
 
 func (m MemoryDeviceFormFactor) String() string {
-	factors := [...]string{
+	return safeLookup(byte(m)-1,
 		"Other",
 		"Unknown",
 		"SIMM",
@@ -31,8 +31,7 @@ func (m MemoryDeviceFormFactor) String() string {
 		"SODIMM",
 		"SRIMM",
 		"FB-DIMM",
-	}
-	return factors[m-1]
+	)
 }
 
 func (m MemoryDeviceFormFactor) MarshalText() ([]byte, error) {
@@ -42,7 +41,7 @@ func (m MemoryDeviceFormFactor) MarshalText() ([]byte, error) {
 type MemoryDeviceType byte
 
 func (m MemoryDeviceType) String() string {
-	types := [...]string{
+	return safeLookup(byte(m)-1,
 		"Other",
 		"Unknown",
 		"DRAM",
@@ -73,11 +72,7 @@ func (m MemoryDeviceType) String() string {
 		"LPDDR2",
 		"LPDDR3",
 		"LPDDR4",
-	}
-	if len(types) <= int(m) {
-		return "Unknown"
-	}
-	return types[m-1]
+	)
 }
 
 func (m MemoryDeviceType) MarshalText() ([]byte, error) {
@@ -184,7 +179,7 @@ func (m MemoryDevice) String() string {
 		"\tSerial Number: %s\n"+
 		"\tAsset Tag: %s\n"+
 		"\tPart Number: %s\n"+
-		"\tAttributes: %s\n"+
+		"\tAttributes: %x\n"+
 		"\tConfigured Memory Clock Speed: %d\n"+
 		"\tMinimum voltage: %d\n"+
 		"\tMaximum voltage: %d\n"+
@@ -214,7 +209,7 @@ func (m MemoryDevice) String() string {
 }
 
 func newMemoryDevice(h dmiHeader) dmiTyper {
-	data := h.data
+	data := h.data()
 	res := &MemoryDevice{
 		PhysicalMemoryArrayHandle:  u16(data[0x04:0x06]),
 		ErrorInformationHandle:     u16(data[0x06:0x08]),

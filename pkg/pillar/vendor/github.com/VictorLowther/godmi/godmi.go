@@ -10,12 +10,10 @@ package godmi
 import (
 	"bytes"
 	"fmt"
+	"github.com/digitalocean/go-smbios/smbios"
 	"io/ioutil"
-	"os"
 	"strconv"
-	"strings"
 	"sync"
-	"syscall"
 )
 
 const OUT_OF_SPEC = "<OUT OF SPEC>"
@@ -117,7 +115,7 @@ func (b SMBIOSStructureType) String() string {
 		"Management Controller Host Interface", /* 42 */
 	}
 
-	if b > 42 {
+	if int(b) >= len(types) {
 		return "unspported type:" + strconv.Itoa(int(b))
 	}
 	return types[b]
@@ -131,204 +129,69 @@ type infoCommon struct {
 	handle SMBIOSStructureHandle
 }
 
-type entryPoint struct {
-	Anchor        []byte //4
-	Checksum      byte
-	Length        byte
-	MajorVersion  byte
-	MinorVersion  byte
-	MaxSize       uint16
-	Revision      byte
-	FormattedArea []byte // 5
-	InterAnchor   []byte // 5
-	InterChecksum byte
-	TableLength   uint16
-	TableAddress  uint32
-	NumberOfSM    uint16
-	BCDRevision   byte
+type dmiHeader []byte
+
+func (h dmiHeader) smType() SMBIOSStructureType {
+	return SMBIOSStructureType(h[0x00])
 }
 
-type dmiHeader struct {
-	infoCommon
-	data      []byte
-	strFields []string
+func (h dmiHeader) len() int {
+	return int(h[0x01])
 }
 
-/*
- * Attempt to find the DMI data.
- * First, look for /sys files.  This appears to work for linux kernel with /sys enabled.
- *   Return the filename of the quick DMI data blob.
- * Second, check for EFI address in the systab for efi.  If present, return the
- *   memory descriptor and no quick look file.
- * Third, scan memory for _SM_.
- */
-func getEntryData() (data []byte, file string, err error) {
-	// return /sys file if could be used.
-	file = ""
-
-	// Check for dmi in /sys
-	data, err = ioutil.ReadFile("/sys/firmware/dmi/tables/smbios_entry_point")
-	if err == nil {
-		data, err = anchor(data)
-		if err == nil {
-			file = "/sys/firmware/dmi/tables/DMI"
-			return
-		}
-	}
-
-	// Check for efi
-	data, err = ioutil.ReadFile("/sys/firmware/efi/systab")
-	if err != nil {
-		data, err = ioutil.ReadFile("/proc/efi/systab")
-	}
-	// we have a efi systab - look for address
-	if err == nil {
-		sdata := string(data)
-		lines := strings.Split(sdata, "\n")
-
-		for _, line := range lines {
-			parts := strings.Split(line, "=")
-			if len(parts) != 2 {
-				continue
-			}
-
-			if parts[0] == "SMBIOS" {
-				offset, err2 := strconv.ParseUint(parts[1], 0, 32)
-				if err2 != nil {
-					continue
-				}
-				data, err = getMem(uint32(offset), 0x20)
-				if err == nil {
-					data, err = anchor(data)
-					if err == nil {
-						return
-					}
-				}
-			}
-		}
-		return nil, "", fmt.Errorf("EFI enabled, but table not found\n")
-	}
-
-	// Last ditch hope
-	data, err = getMem(0xF0000, 0x10000)
-	if err == nil {
-		data, err = anchor(data)
-	}
-	return
+func (h dmiHeader) handle() SMBIOSStructureHandle {
+	return SMBIOSStructureHandle(u16(h[0x02:0x04]))
 }
 
-func newEntryPoint() (eps *entryPoint, file string, err error) {
-	eps = new(entryPoint)
-
-	data, file, err := getEntryData()
-	if err != nil {
-		return
+func (h dmiHeader) end() int {
+	start := h.len()
+	end := bytes.Index(h[start:], []byte{0, 0})
+	if end == -1 {
+		return -1
 	}
-	eps.Anchor = data[:0x04]
-	eps.Checksum = data[0x04]
-	eps.Length = data[0x05]
-	eps.MajorVersion = data[0x06]
-	eps.MinorVersion = data[0x07]
-	eps.MaxSize = u16(data[0x08:0x0A])
-	eps.Revision = data[0x0A]
-	eps.FormattedArea = data[0x0B:0x0F]
-	eps.InterAnchor = data[0x10:0x15]
-	eps.TableLength = u16(data[0x16:0x18])
-	eps.TableAddress = u32(data[0x18:0x1C])
-	eps.NumberOfSM = u16(data[0x1C:0x1E])
-	eps.BCDRevision = data[0x1E]
-	return
+	return start + end
 }
 
-func (e entryPoint) StructureTableMem() ([]byte, error) {
-	return getMem(e.TableAddress, uint32(e.TableLength))
+func (h dmiHeader) data() []byte {
+	res := make([]byte, 256)
+	copy(res, h[:h.len()])
+	return res
 }
 
-func newdmiHeader(d []byte) *dmiHeader {
+func (h dmiHeader) FieldString(idx int) string {
+	end := h.end()
+	if end == -1 || idx == 0 {
+		return ""
+	}
+	bs := bytes.Split(h[h.len():end], []byte{0})
+	if idx > len(bs) {
+		return fmt.Sprintf("FieldString ### ERROR:strFields Len:%d, strIndex:%d", len(bs), idx)
+	}
+	return string(bs[idx-1])
+}
+
+func newdmiHeader(d []byte) dmiHeader {
 	if len(d) < 0x04 {
 		return nil
 	}
-	h := dmiHeader{
-		infoCommon: infoCommon{
-			smType: SMBIOSStructureType(d[0x00]),
-			length: d[1],
-			handle: SMBIOSStructureHandle(u16(d[0x02:0x04])),
-		},
-		data: d,
-	}
-	h.setStringFields()
-	return &h
+	return dmiHeader(d)
 }
 
-func (h dmiHeader) Next() *dmiHeader {
-	index := h.getStructTableEndIndex()
+func (h dmiHeader) Next() dmiHeader {
+	index := h.end()
 
 	if index == -1 {
 		return nil
 	}
-	return newdmiHeader(h.data[index+2:])
-}
-
-func (h dmiHeader) getStructTableEndIndex() int {
-	de := []byte{0, 0}
-	next := h.data[h.length:]
-	endIdx := bytes.Index(next, de)
-	if endIdx == -1 {
-		return -1
-	}
-	return int(h.length) + endIdx
+	return newdmiHeader(h[index+2:])
 }
 
 func (h dmiHeader) decode() error {
-	t := h.smType
-	newfn, err := getTypeFunc(t)
+	newfn, err := getTypeFunc(h.smType())
 	if err != nil {
 		return err
 	}
 	newfn(h)
-	return nil
-}
-
-func (h *dmiHeader) setStringFields() {
-	index := h.getStructTableEndIndex()
-	if index == -1 {
-		return
-	}
-	fieldData := h.data[h.length:index]
-	bs := bytes.Split(fieldData, []byte{0})
-	for _, v := range bs {
-		h.strFields = append(h.strFields, string(v))
-	}
-}
-
-func (h dmiHeader) FieldString(strIndex int) string {
-	if strIndex == 0 {
-		return ""
-	}
-	if strIndex > len(h.strFields) {
-		return fmt.Sprintf("FieldString ### ERROR:strFields Len:%d, strIndex:%d", len(h.strFields), strIndex)
-	}
-	return h.strFields[strIndex-1]
-}
-
-func (e entryPoint) StructureTable(file string) error {
-	var err error
-	var tmem []byte
-	if file == "" {
-		tmem, err = e.StructureTableMem()
-	} else {
-		tmem, err = ioutil.ReadFile(file)
-	}
-	if err != nil {
-		return err
-	}
-	for hd := newdmiHeader(tmem); hd != nil; hd = hd.Next() {
-		err := hd.decode()
-		if err != nil {
-			//fmt.Println("info: ", err)
-			continue
-		}
-	}
 	return nil
 }
 
@@ -343,6 +206,8 @@ type typeFunc map[SMBIOSStructureType]newFunction
 var g_typeFunc = make(typeFunc)
 
 var g_lock sync.Mutex
+
+var smbiosVersion string
 
 func addTypeFunc(t SMBIOSStructureType, f newFunction) {
 	g_lock.Lock()
@@ -359,44 +224,23 @@ func getTypeFunc(t SMBIOSStructureType) (fn newFunction, err error) {
 }
 
 func Init() error {
-	eps, file, err := newEntryPoint()
+	stream, ep, err := smbios.Stream()
 	if err != nil {
 		return err
 	}
-	return eps.StructureTable(file)
-}
-
-func getMem(base uint32, length uint32) (mem []byte, err error) {
-	file, err := os.Open("/dev/mem")
+	defer stream.Close()
+	maj, min, _ := ep.Version()
+	smbiosVersion = fmt.Sprintf("%d.%d", maj, min)
+	tmem, err := ioutil.ReadAll(stream)
 	if err != nil {
-		return
+		return err
 	}
-	defer file.Close()
-	fd := file.Fd()
-	mmoffset := base % uint32(os.Getpagesize())
-	mm, err := syscall.Mmap(int(fd), int64(base-mmoffset), int(mmoffset+length), syscall.PROT_READ, syscall.MAP_SHARED)
-	if err != nil {
-		return
+	for hd := newdmiHeader(tmem); hd != nil; hd = hd.Next() {
+		err := hd.decode()
+		if err != nil {
+			//fmt.Println("info: ", err)
+			continue
+		}
 	}
-	mem = make([]byte, length)
-	copy(mem, mm[mmoffset:])
-	err = syscall.Munmap(mm)
-	if err != nil {
-		return
-	}
-	return
-}
-
-func anchor(mem []byte) ([]byte, error) {
-	anchor := []byte{'_', 'S', 'M', '_'}
-	i := bytes.Index(mem, anchor)
-	if i == -1 {
-		return nil, fmt.Errorf("find anchor error!")
-	}
-	return mem[i:], nil
-}
-
-func version(mem []byte) string {
-	ver := strconv.Itoa(int(mem[0x06])) + "." + strconv.Itoa(int(mem[0x07]))
-	return ver
+	return nil
 }
