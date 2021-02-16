@@ -13,18 +13,21 @@ package containerd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/containerd/containerd"
-	"github.com/containerd/containerd/containers"
-	"github.com/containerd/containerd/oci"
-	zconfig "github.com/lf-edge/eve/api/go/config"
-	"github.com/lf-edge/eve/pkg/pillar/types"
-	"github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/runtime-spec/specs-go"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/oci"
+	"github.com/lf-edge/eve/pkg/pillar/types"
+	"github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/opencontainers/runc/libcontainer/user"
+	"github.com/opencontainers/runtime-spec/specs-go"
+
+	zconfig "github.com/lf-edge/eve/api/go/config"
 )
 
 const eveScript = "/bin/eve"
@@ -129,18 +132,8 @@ func (s *ociSpec) AddLoader(volume string) error {
 			return err
 		}
 
-		// create cmdline manifest
-		// each item needs to be independently quoted for initrd
-		execpathQuoted := make([]string, 0)
-		for _, s := range s.Process.Args {
-			execpathQuoted = append(execpathQuoted, fmt.Sprintf("\"%s\"", s))
-		}
-		if err := ioutil.WriteFile(filepath.Join(volumeRoot, "cmdline"),
-			[]byte(strings.Join(execpathQuoted, " ")), 0644); err != nil {
-			return err
-		}
-
 		// create env manifest
+		envWhitelist := make([]string, 0) //store envs for whitelist of su
 		envContent := ""
 		if s.Process.Cwd != "" {
 			envContent = fmt.Sprintf("export WORKDIR=\"%s\"\n", s.Process.Cwd)
@@ -150,13 +143,49 @@ func (s *ociSpec) AddLoader(volume string) error {
 			if len(keyAndValueSlice) == 2 {
 				//handles Key=Value case
 				envContent = envContent + fmt.Sprintf("export %s=\"%s\"\n", keyAndValueSlice[0], keyAndValueSlice[1])
+				envWhitelist = append(envWhitelist, keyAndValueSlice[0])
 			} else {
 				//handles Key= case
 				envContent = envContent + fmt.Sprintf("export %s\n", e)
+				envWhitelist = append(envWhitelist, e)
 			}
-
 		}
 		if err := ioutil.WriteFile(filepath.Join(volumeRoot, "environment"), []byte(envContent), 0644); err != nil {
+			return err
+		}
+
+		envInsert := ""
+		if len(envWhitelist) > 0 {
+			envInsert = fmt.Sprintf("-w '%s'", strings.Join(envWhitelist, ","))
+		}
+
+		// create cmdline manifest
+		// each item needs to be independently quoted for initrd
+		execpathQuoted := make([]string, 0)
+		for _, s := range s.Process.Args {
+			execpathQuoted = append(execpathQuoted, fmt.Sprintf("\"%s\"", s))
+		}
+		execpath := strings.Join(execpathQuoted, " ")
+		username := ""
+		if s.Process.User.UID != 0 {
+			users, err := user.ParsePasswdFileFilter(filepath.Join(s.Root.Path, "etc", "passwd"), func(u user.User) bool {
+				return u.Uid == int(s.Process.User.UID)
+			})
+			if err != nil {
+				return fmt.Errorf("fail to read passwd inside container: %s", err)
+			}
+			if len(users) == 0 {
+				return fmt.Errorf("cannot find user %d inside container", s.Process.User.UID)
+			}
+			username = users[0].Name
+		} else if s.Process.User.Username != "" && s.Process.User.Username != "root" {
+			username = s.Process.User.Username
+		}
+		if username != "" {
+			execpath = fmt.Sprintf("su -l %s %s -c '%s'", envInsert, username, execpath)
+		}
+		if err := ioutil.WriteFile(filepath.Join(volumeRoot, "cmdline"),
+			[]byte(execpath), 0644); err != nil {
 			return err
 		}
 
