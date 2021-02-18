@@ -39,6 +39,34 @@ type DomainConfig struct {
 
 	// CipherBlockStatus, for encrypted cloud-init data
 	CipherBlockStatus
+
+	// MetaDataType for select type of metadata service for app
+	MetaDataType MetaDataType
+}
+
+// MetaDataType of metadata service for app
+// must match the values in the proto definition
+type MetaDataType uint8
+
+// types of metadata service for app if CloudInitUserData provided
+const (
+	MetaDataDrive MetaDataType = iota + 0 // Default
+	MetaDataOpenStack
+	MetaDataEC2
+)
+
+// String returns the string name
+func (metaDataType MetaDataType) String() string {
+	switch metaDataType {
+	case MetaDataDrive:
+		return "MetaDataDrive"
+	case MetaDataOpenStack:
+		return "MetaDataOpenStack"
+	case MetaDataEC2:
+		return "MetaDataEC2"
+	default:
+		return fmt.Sprintf("Unknown MetaDataType %d", metaDataType)
+	}
 }
 
 // GetOCIConfigDir returns a location for OCI Config

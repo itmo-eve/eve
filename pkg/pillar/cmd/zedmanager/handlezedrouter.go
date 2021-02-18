@@ -37,6 +37,15 @@ func MaybeAddAppNetworkConfig(ctx *zedmanagerContext,
 				m.GetStatsIPAddr.String(), aiConfig.CollectStatsIPAddr.String())
 			changed = true
 		}
+		if m.CloudInitUserData != aiConfig.CloudInitUserData {
+			log.Functionf("MaybeAddAppNetworkConfig: CloudInitUserData changed")
+			changed = true
+		}
+		if m.MetaDataType != aiConfig.MetaDataType {
+			log.Functionf("MaybeAddAppNetworkConfig: MetaDataType changed from  %s to %s",
+				m.MetaDataType.String(), aiConfig.MetaDataType.String())
+			changed = true
+		}
 		for i, new := range aiConfig.UnderlayNetworkList {
 			old := m.UnderlayNetworkList[i]
 			if !reflect.DeepEqual(new.ACLs, old.ACLs) {
@@ -52,10 +61,13 @@ func MaybeAddAppNetworkConfig(ctx *zedmanagerContext,
 	}
 	if changed {
 		nc := types.AppNetworkConfig{
-			UUIDandVersion: aiConfig.UUIDandVersion,
-			DisplayName:    aiConfig.DisplayName,
-			Activate:       aiConfig.Activate,
-			GetStatsIPAddr: aiConfig.CollectStatsIPAddr,
+			UUIDandVersion:    aiConfig.UUIDandVersion,
+			DisplayName:       aiConfig.DisplayName,
+			Activate:          aiConfig.Activate,
+			GetStatsIPAddr:    aiConfig.CollectStatsIPAddr,
+			CloudInitUserData: aiConfig.CloudInitUserData,
+			CipherBlockStatus: aiConfig.CipherBlockStatus,
+			MetaDataType:      aiConfig.MetaDataType,
 		}
 		nc.UnderlayNetworkList = make([]types.UnderlayNetworkConfig,
 			len(aiConfig.UnderlayNetworkList))
