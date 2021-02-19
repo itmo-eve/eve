@@ -24,7 +24,6 @@ import (
 	"github.com/containerd/containerd/oci"
 	"github.com/lf-edge/eve/pkg/pillar/types"
 	"github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/opencontainers/runc/libcontainer/user"
 	"github.com/opencontainers/runtime-spec/specs-go"
 
 	zconfig "github.com/lf-edge/eve/api/go/config"
@@ -156,7 +155,7 @@ func (s *ociSpec) AddLoader(volume string) error {
 
 		envInsert := ""
 		if len(envWhitelist) > 0 {
-			envInsert = fmt.Sprintf("-w '%s'", strings.Join(envWhitelist, ","))
+			envInsert = fmt.Sprintf("--preserve-env=%s", strings.Join(envWhitelist, ","))
 		}
 
 		// create cmdline manifest
@@ -166,23 +165,12 @@ func (s *ociSpec) AddLoader(volume string) error {
 			execpathQuoted = append(execpathQuoted, fmt.Sprintf("\"%s\"", s))
 		}
 		execpath := strings.Join(execpathQuoted, " ")
-		username := ""
 		if s.Process.User.UID != 0 {
-			users, err := user.ParsePasswdFileFilter(filepath.Join(s.Root.Path, "etc", "passwd"), func(u user.User) bool {
-				return u.Uid == int(s.Process.User.UID)
-			})
-			if err != nil {
-				return fmt.Errorf("fail to read passwd inside container: %s", err)
+			groupInsert := ""
+			if s.Process.User.GID != 0 {
+				groupInsert = fmt.Sprintf("-g '#%d'", s.Process.User.GID)
 			}
-			if len(users) == 0 {
-				return fmt.Errorf("cannot find user %d inside container", s.Process.User.UID)
-			}
-			username = users[0].Name
-		} else if s.Process.User.Username != "" && s.Process.User.Username != "root" {
-			username = s.Process.User.Username
-		}
-		if username != "" {
-			execpath = fmt.Sprintf("su -l %s %s -c '%s'", envInsert, username, execpath)
+			execpath = fmt.Sprintf("/usr/bin/sudo -u '#%d' %s %s %s", s.Process.User.UID, groupInsert, envInsert, execpath)
 		}
 		if err := ioutil.WriteFile(filepath.Join(volumeRoot, "cmdline"),
 			[]byte(execpath), 0644); err != nil {
