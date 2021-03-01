@@ -1517,22 +1517,6 @@ func configToStatus(ctx *domainContext, config types.DomainConfig,
 		ds.Vdev = fmt.Sprintf("xvd%c", int('a')+i)
 	}
 
-	if config.IsCipher || config.CloudInitUserData != nil {
-		if status.OCIConfigDir != "" {
-			envList, err := fetchEnvVariablesFromCloudInit(ctx, config)
-			if err != nil {
-				return fmt.Errorf("failed to fetch environment variable from userdata. %s", err.Error())
-			}
-			status.EnvVariables = envList
-		} else {
-			ds, err := createCloudInitISO(ctx, config)
-			if err != nil {
-				return err
-			}
-			status.DiskStatusList = append(status.DiskStatusList, *ds)
-		}
-	}
-
 	if need9P {
 		status.DiskStatusList = append(status.DiskStatusList, types.DiskStatus{
 			FileLocation: "/mnt",

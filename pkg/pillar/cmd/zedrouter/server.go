@@ -9,6 +9,7 @@ package zedrouter
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -51,54 +52,9 @@ type openstackHandler struct {
 	ctx *zedrouterContext
 }
 
-// responseWriter is a minimal wrapper for http.ResponseWriter that allows the
-// written HTTP status code to be captured for logging.
-type responseWriter struct {
-	http.ResponseWriter
-	status      int
-	wroteHeader bool
-}
-
-func wrapResponseWriter(w http.ResponseWriter) *responseWriter {
-	return &responseWriter{ResponseWriter: w}
-}
-
-func (rw *responseWriter) Status() int {
-	return rw.status
-}
-
-func (rw *responseWriter) WriteHeader(code int) {
-	if rw.wroteHeader {
-		return
-	}
-
-	rw.status = code
-	rw.ResponseWriter.WriteHeader(code)
-	rw.wroteHeader = true
-
-	return
-}
-
-// LoggingMiddleware logs the incoming HTTP request & its duration.
-func LoggingMiddleware() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		fn := func(w http.ResponseWriter, r *http.Request) {
-			defer func() {
-				if err := recover(); err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-				}
-			}()
-			wrapped := wrapResponseWriter(w)
-			next.ServeHTTP(wrapped, r)
-			log.Errorf("ServeHTTP LOGGER %s", r.URL.Path)
-		}
-		return http.HandlerFunc(fn)
-	}
-}
-
 func createServer4(ctx *zedrouterContext, bridgeIP string, bridgeName string) error {
 	if bridgeIP == "" {
-		err := fmt.Errorf("Can't run server on %s: no bridgeIP", bridgeName)
+		err := fmt.Errorf("can't run server on %s: no bridgeIP", bridgeName)
 		log.Error(err)
 		return err
 	}
@@ -193,10 +149,9 @@ func runServer(mux http.Handler, network string, ipaddr string,
 
 	// XXX no to place to specify network. Might be an issue when we
 	// add IPv6?
-	m := LoggingMiddleware()
 	srv := http.Server{
 		Addr:    ipaddr + ":80",
-		Handler: m(mux),
+		Handler: mux,
 	}
 	idleConnsClosed := make(chan struct{})
 	go func() {
@@ -299,7 +254,7 @@ func (hdl hostnameHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ServeHTTP for metadataHandler returns json
+// ServeHTTP for metadataHandler process requests for ec2-compatible requests
 func (hdl metadataHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Errorf("ServeHTTP metadataHandler %s", r.URL.Path)
 	dirname, filename := path.Split(strings.TrimSuffix(r.URL.Path, "/"))
@@ -312,60 +267,137 @@ func (hdl metadataHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		hostname = anStatus.DisplayName
 		id = anStatus.UUIDandVersion.UUID.String()
 	} else {
+		log.Errorf("No AppNetworkStatus for %s",
+			remoteIP.String())
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	switch filename {
 	case "meta-data":
+		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "instance-id")
 		fmt.Fprintln(w, "hostname")
 		fmt.Fprintln(w, "public-keys/")
+		return
 	case "hostname":
+		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, hostname)
+		return
 	case "public-keys":
-		fmt.Fprint(w, "0=test")
-	case "0":
-		if _, previousFile := path.Split(dirname); previousFile == "public-keys" {
-			fmt.Fprint(w, "openssh-key")
+		appConfig := lookupAppNetworkConfig(hdl.ctx, anStatus.Key())
+		if appConfig == nil {
+			log.Errorf("No AppNetworkConfig for %s",
+				anStatus.Key())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
+		keys, err := getSSHPasswords(hdl.ctx, appConfig)
+		if err != nil {
+			log.Errorf("cannot get ssh passwords for %s: %v",
+				anStatus.Key(), err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		for ind := range keys {
+			fmt.Fprint(w, fmt.Sprintf("%d=key-%d", ind, ind))
+		}
+		return
 	case "openssh-key":
-		log.Errorf("openssh-key %s", dirname)
-		if _, previousFile := path.Split(dirname); previousFile == "0" {
-			_, err := fmt.Fprintln(w, "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCwYIGaByqVI0M3qFHMvAs4s5aGkDKV6WfEzHuwc+7LlUpXom86qhT0RFVePHqCnTgi0UA7d92wumvol334M/bDrke/KRpkvXEmmOgUblOBM5jAXCpNyi0GjjgzFCwU0y1BIGEapr1W94GgOrbQc2VohmNVmFyvb9dh1oSOw9niWcYKH48Me0zzlqpNi3hMILUOlnBPVhbNI2HNK2V8jN6Zme+B66G7MlBT+isY0X55gTNdfwX/VngUGgeYXeWQdQe2rqQHPOnr8ms8O/7HMWGtdWJo26p67SCj9YFHv9F06WEduhhOLEzatpyHPoBrZD/+SVGz5xrKHbNjw35zJ2eXd8R4oZN5IMULEmIwpj3s6jBz8ZXAlkb3acXGdcCPF0fMFtsgGjAzOOF3TH/N5l81kvnyNOwWjg1Y63wBVLsDjujVUsJYDiriUPKE6JbZdAoXYJeWRm8j2i4Qox5cdA5ZBdywg9M+oFtuRtdIsq53He4AcTZttz+arZhgoP1mYO0=")
+		_, previousFile := path.Split(dirname)
+		keyIndex, err := strconv.Atoi(previousFile)
+		if err == nil {
+			//request for ssh key content
+			appConfig := lookupAppNetworkConfig(hdl.ctx, anStatus.Key())
+			if appConfig == nil {
+				log.Errorf("No AppNetworkConfig for %s",
+					anStatus.Key())
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			keys, err := getSSHPasswords(hdl.ctx, appConfig)
 			if err != nil {
-				log.Errorf("openssh-key error %s", err)
+				log.Errorf("cannot get ssh passwords for %s: %v",
+					anStatus.Key(), err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			if keyIndex < len(keys) {
+				w.WriteHeader(http.StatusOK)
+				fmt.Fprintln(w, keys[keyIndex])
+				return
 			}
 		}
 	case "instance-id":
+		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, id)
+		return
+	default:
+		if strings.Contains(r.URL.Path, "/public-keys/") {
+			keyIndex, err := strconv.Atoi(filename)
+			if err == nil {
+				//request for ssh key type
+				appConfig := lookupAppNetworkConfig(hdl.ctx, anStatus.Key())
+				if appConfig == nil {
+					log.Errorf("No AppNetworkConfig for %s",
+						anStatus.Key())
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				keys, err := getSSHPasswords(hdl.ctx, appConfig)
+				if err != nil {
+					log.Errorf("cannot get ssh passwords for %s",
+						anStatus.Key())
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				if keyIndex < len(keys) {
+					w.WriteHeader(http.StatusOK)
+					fmt.Fprint(w, "openssh-key")
+					return
+				}
+			}
+		}
 	}
-	log.Errorf("ServeHTTP metadataHandler done %s", r.URL.Path)
+	w.WriteHeader(http.StatusNotFound)
 }
 
-// ServeHTTP for userDataHandler returns json
+// ServeHTTP for userDataHandler process requests for user-data
 func (hdl userDataHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Errorf("ServeHTTP userDataHandler %s", r.URL.Path)
 	remoteIP := net.ParseIP(strings.Split(r.RemoteAddr, ":")[0])
 	anStatus := lookupAppNetworkStatusByAppIP(hdl.ctx, remoteIP)
 	if anStatus != nil {
 		appConfig := lookupAppNetworkConfig(hdl.ctx, anStatus.Key())
-		if appConfig != nil {
-			log.Errorf("ServeHTTP ERROR: %s", appConfig.UserData)
+		if appConfig == nil {
+			log.Errorf("No AppNetworkConfig for %s",
+				anStatus.Key())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 		}
-	} else {
-		w.WriteHeader(http.StatusNotFound)
+		userData, err := getCloudInitUserData(hdl.ctx, appConfig)
+		if err != nil {
+			log.Errorf("cannot get userData for %s: %v",
+				anStatus.Key(), err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		ud, err := base64.StdEncoding.DecodeString(userData)
+		if err != nil {
+			log.Errorf("cannot decode userData for %s: %v",
+				anStatus.Key(), err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Add("Content-Type", "application/octet-stream")
+		w.WriteHeader(http.StatusOK)
+		w.Write(ud)
 		return
 	}
-	w.Header().Add("Content-Type", "text/yaml")
-	resp := []byte("#cloud-config\npassword: passw0rd\nchpasswd: { expire: False }\nssh_pwauth: True\n")
-	w.WriteHeader(http.StatusOK)
-	w.Write(resp)
+	w.WriteHeader(http.StatusNotFound)
 }
 
-// ServeHTTP for openstackHandler
+// ServeHTTP for openstackHandler metadata service
 func (hdl openstackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Errorf("ServeHTTP openstackHandler %s", r.URL.Path)
 	dirname, filename := path.Split(strings.TrimSuffix(r.URL.Path, "/"))
 	dirname = strings.TrimSuffix(dirname, "/")
 	remoteIP := net.ParseIP(strings.Split(r.RemoteAddr, ":")[0])
@@ -375,47 +407,84 @@ func (hdl openstackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if anStatus != nil {
 		hostname = anStatus.DisplayName
 		id = anStatus.UUIDandVersion.UUID.String()
-		appConfig := lookupAppNetworkConfig(hdl.ctx, anStatus.Key())
-		if appConfig != nil {
-			log.Errorf("ServeHTTP ERROR: %s", appConfig.UserData)
-		}
 	} else {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
-	key := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCwYIGaByqVI0M3qFHMvAs4s5aGkDKV6WfEzHuwc+7LlUpXom86qhT0RFVePHqCnTgi0UA7d92wumvol334M/bDrke/KRpkvXEmmOgUblOBM5jAXCpNyi0GjjgzFCwU0y1BIGEapr1W94GgOrbQc2VohmNVmFyvb9dh1oSOw9niWcYKH48Me0zzlqpNi3hMILUOlnBPVhbNI2HNK2V8jN6Zme+B66G7MlBT+isY0X55gTNdfwX/VngUGgeYXeWQdQe2rqQHPOnr8ms8O/7HMWGtdWJo26p67SCj9YFHv9F06WEduhhOLEzatpyHPoBrZD/+SVGz5xrKHbNjw35zJ2eXd8R4oZN5IMULEmIwpj3s6jBz8ZXAlkb3acXGdcCPF0fMFtsgGjAzOOF3TH/N5l81kvnyNOwWjg1Y63wBVLsDjujVUsJYDiriUPKE6JbZdAoXYJeWRm8j2i4Qox5cdA5ZBdywg9M+oFtuRtdIsq53He4AcTZttz+arZhgoP1mYO0="
 	switch filename {
 	case "openstack":
+		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "latest")
 	case "meta_data.json":
+		appConfig := lookupAppNetworkConfig(hdl.ctx, anStatus.Key())
+		if appConfig == nil {
+			log.Errorf("No AppNetworkConfig for %s",
+				anStatus.Key())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		keys, err := getSSHPasswords(hdl.ctx, appConfig)
+		if err != nil {
+			log.Errorf("cannot get ssh passwords for %s",
+				anStatus.Key())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		var keysMap []map[string]string
+		publicKeys := make(map[string]string)
+		for ind, key := range keys {
+			keysMap = append(keysMap, map[string]string{
+				"data": fmt.Sprintf("%s\n", key),
+				"type": "ssh",
+				"name": fmt.Sprintf("key-%d", ind),
+			})
+			publicKeys[fmt.Sprintf("key-%d", ind)] = fmt.Sprintf("%s\n", key)
+		}
 		resp, _ := json.Marshal(map[string]interface{}{
 			"uuid":         id,
 			"hostname":     hostname,
 			"name":         hostname,
 			"launch_index": 0,
-			"keys": []map[string]string{
-				{
-					"data": fmt.Sprintf("%s\n", key),
-					"type": "ssh",
-					"name": "key",
-				},
-			},
-			"public_keys": map[string]string{
-				"key": fmt.Sprintf("%s\n", key),
-			},
+			"keys":         keysMap,
+			"public_keys":  publicKeys,
 		})
+		w.WriteHeader(http.StatusOK)
 		w.Write(resp)
 	case "network_data.json":
 		resp, _ := json.Marshal(map[string]interface{}{
 			"services": []string{},
 			"networks": []string{},
 		})
+		w.WriteHeader(http.StatusOK)
 		w.Write(resp)
-	case "user-data":
-		resp := []byte("#cloud-config\npassword: passw0rd\nchpasswd: { expire: False }\nssh_pwauth: True\n")
-		w.Write(resp)
+	case "user_data":
+		appConfig := lookupAppNetworkConfig(hdl.ctx, anStatus.Key())
+		if appConfig == nil {
+			log.Errorf("No AppNetworkConfig for %s",
+				anStatus.Key())
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		userData, err := getCloudInitUserData(hdl.ctx, appConfig)
+		if err != nil {
+			log.Errorf("cannot get userData for %s: %v",
+				anStatus.Key(), err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		ud, err := base64.StdEncoding.DecodeString(userData)
+		if err != nil {
+			log.Errorf("cannot decode userData for %s: %v",
+				anStatus.Key(), err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Header().Add("Content-Type", "text/yaml")
+		w.WriteHeader(http.StatusOK)
+		w.Write(ud)
 	case "vendor_data.json":
+		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("{}"))
 	}
+	w.WriteHeader(http.StatusNotFound)
 }
