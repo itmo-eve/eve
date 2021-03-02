@@ -66,10 +66,12 @@ func handleVolumeCreate(ctxArg interface{}, key string,
 		var purgable uint64
 		statuses := lookupVolumesStatusesWithTheSameAI(ctx, &config)
 		for _, st := range statuses {
+			log.Errorf("handleVolumeCreate(%s) status obtained: %s", key, st.Key())
 			// we add MaxVolSize inside getRemainingDiskSpace, so here we can substract the diff
 			// taking into account, that we will purge disks soon
 			purgable += st.MaxVolSize - uint64(st.CurrentSize)
 		}
+		log.Errorf("handleVolumeCreate(%s) purgable: %d", key, purgable)
 		// Check disk usage
 		remaining, err := getRemainingDiskSpace(ctx)
 		if err != nil {
@@ -234,10 +236,10 @@ func lookupVolumeConfig(ctx *volumemgrContext,
 func lookupVolumesStatusesWithTheSameAI(ctx *volumemgrContext, vc *types.VolumeConfig) []*types.VolumeStatus {
 	vrc := lookupVolumeRefConfig(ctx, vc.Key())
 	if vrc == nil {
-		log.Functionf("lookupVolumesStatusesWithTheSameRefs: VolumeRefConfig not present for %s", vc.Key())
+		log.Errorf("lookupVolumesStatusesWithTheSameRefs: VolumeRefConfig not present for %s", vc.Key())
 	} else {
+		log.Errorf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs")
 		var retList []*types.VolumeStatus
-		log.Functionf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs")
 		pub := ctx.pubVolumeStatus
 		items := pub.GetAll()
 		for _, st := range items {
@@ -247,7 +249,7 @@ func lookupVolumesStatusesWithTheSameAI(ctx *volumemgrContext, vc *types.VolumeC
 				retList = append(retList, &status)
 			}
 		}
-		log.Functionf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs: Done")
+		log.Errorf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs: Done")
 		return retList
 	}
 	return nil
