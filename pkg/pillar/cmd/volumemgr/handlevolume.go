@@ -63,6 +63,13 @@ func handleVolumeCreate(ctxArg interface{}, key string,
 	}
 	publishVolumeStatus(ctx, status)
 	if !ctx.globalConfig.GlobalValueBool(types.IgnoreDiskCheckForApps) {
+		var purgable uint64
+		statuses := lookupVolumesStatusesWithTheSameAI(ctx, &config)
+		for _, st := range statuses {
+			// we add MaxVolSize inside getRemainingDiskSpace, so here we can substract the diff
+			// taking into account, that we will purge disks soon
+			purgable += st.MaxVolSize - uint64(st.CurrentSize)
+		}
 		// Check disk usage
 		remaining, err := getRemainingDiskSpace(ctx)
 		if err != nil {
@@ -75,7 +82,7 @@ func handleVolumeCreate(ctxArg interface{}, key string,
 				log.Errorf("handleVolumeCreate(%s): exception while publishing diskmetric. %s", key, err.Error())
 			}
 			return
-		} else if remaining < status.MaxVolSize {
+		} else if remaining-purgable < status.MaxVolSize {
 			errStr := fmt.Sprintf("Remaining disk space %d volume needs %d\n",
 				remaining, status.MaxVolSize)
 			status.SetError(errStr, time.Now())
@@ -222,6 +229,28 @@ func lookupVolumeConfig(ctx *volumemgrContext,
 	config := c.(types.VolumeConfig)
 	log.Tracef("lookupVolumeConfig(%s) Done", key)
 	return &config
+}
+
+func lookupVolumesStatusesWithTheSameAI(ctx *volumemgrContext, vc *types.VolumeConfig) []*types.VolumeStatus {
+	vrc := lookupVolumeRefConfig(ctx, vc.Key())
+	if vrc == nil {
+		log.Functionf("lookupVolumesStatusesWithTheSameRefs: VolumeRefConfig not present for %s", vc.Key())
+	} else {
+		var retList []*types.VolumeStatus
+		log.Functionf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs")
+		pub := ctx.pubVolumeStatus
+		items := pub.GetAll()
+		for _, st := range items {
+			status := st.(types.VolumeStatus)
+			config := lookupVolumeRefConfig(ctx, status.Key())
+			if config != nil && config.ApplicationInstanceID == vrc.ApplicationInstanceID {
+				retList = append(retList, &status)
+			}
+		}
+		log.Functionf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs: Done")
+		return retList
+	}
+	return nil
 }
 
 func maybeDeleteVolume(ctx *volumemgrContext, status *types.VolumeStatus) {
