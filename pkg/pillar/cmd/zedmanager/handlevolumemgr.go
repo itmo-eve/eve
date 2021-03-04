@@ -29,11 +29,10 @@ func MaybeAddVolumeRefConfig(ctx *zedmanagerContext, appInstID uuid.UUID,
 	} else {
 		log.Tracef("MaybeAddVolumeRefConfig: add for %s", key)
 		vrc := types.VolumeRefConfig{
-			VolumeID:              volumeID,
-			GenerationCounter:     generationCounter,
-			RefCount:              1,
-			MountDir:              mountDir,
-			ApplicationInstanceID: appInstID,
+			VolumeID:          volumeID,
+			GenerationCounter: generationCounter,
+			RefCount:          1,
+			MountDir:          mountDir,
 		}
 		publishVolumeRefConfig(ctx, &vrc)
 	}

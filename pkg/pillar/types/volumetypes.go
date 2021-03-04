@@ -18,6 +18,7 @@ import (
 type VolumeConfig struct {
 	VolumeID                uuid.UUID
 	ContentID               uuid.UUID
+	ApplicationID           uuid.UUID
 	VolumeContentOriginType zconfig.VolumeContentOriginType
 	MaxVolSize              uint64
 	ReadOnly                bool
@@ -215,11 +216,10 @@ func (status VolumeStatus) LogKey() string {
 // If a volume is purged (re-created from scratch) it will either have a new
 // UUID or a new generationCount
 type VolumeRefConfig struct {
-	VolumeID              uuid.UUID
-	GenerationCounter     int64
-	RefCount              uint
-	MountDir              string
-	ApplicationInstanceID uuid.UUID
+	VolumeID          uuid.UUID
+	GenerationCounter int64
+	RefCount          uint
+	MountDir          string
 }
 
 // Key : VolumeRefConfig unique key

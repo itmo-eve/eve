@@ -79,6 +79,15 @@ func parseVolumeConfig(ctx *getconfigContext,
 		}
 		volumeConfig.DisplayName = cfgVolume.GetDisplayName()
 		volumeConfig.ReadOnly = cfgVolume.GetReadonly()
+		appInstanceList := config.GetApps()
+		volumeConfig.ApplicationID = uuid.Nil
+		for _, el := range appInstanceList {
+			for _, vr := range el.VolumeRefList {
+				if vr.Uuid == cfgVolume.GetUuid() {
+					volumeConfig.ApplicationID, _ = uuid.FromString(el.GetUuidandversion().GetUuid())
+				}
+			}
+		}
 		volumeConfig.RefCount = 1
 		publishVolumeConfig(ctx, *volumeConfig)
 	}

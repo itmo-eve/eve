@@ -5,6 +5,7 @@ package volumemgr
 
 import (
 	"fmt"
+	uuid "github.com/satori/go.uuid"
 	"os"
 	"time"
 
@@ -66,10 +67,13 @@ func handleVolumeCreate(ctxArg interface{}, key string,
 		var purgable uint64
 		statuses := lookupVolumesStatusesWithTheSameAI(ctx, &config)
 		for _, st := range statuses {
-			log.Errorf("handleVolumeCreate(%s) status obtained: %s", key, st.Key())
-			// we add MaxVolSize inside getRemainingDiskSpace, so here we can substract the diff
-			// taking into account, that we will purge disks soon
-			purgable += st.MaxVolSize - uint64(st.CurrentSize)
+			log.Errorf("handleVolumeCreate(%s) status obtained: %v", key, st)
+			if st.State >= types.CREATED_VOLUME {
+				// we add MaxVolSize inside getRemainingDiskSpace, so here we can substract the diff
+				// taking into account, that we will purge disks soon, because we receive new volume when another ones
+				// are already created
+				purgable += st.MaxVolSize - uint64(st.CurrentSize)
+			}
 		}
 		log.Errorf("handleVolumeCreate(%s) purgable: %d", key, purgable)
 		// Check disk usage
@@ -234,25 +238,22 @@ func lookupVolumeConfig(ctx *volumemgrContext,
 }
 
 func lookupVolumesStatusesWithTheSameAI(ctx *volumemgrContext, vc *types.VolumeConfig) []*types.VolumeStatus {
-	vrc := lookupVolumeRefConfig(ctx, vc.Key())
-	if vrc == nil {
-		log.Errorf("lookupVolumesStatusesWithTheSameRefs: VolumeRefConfig not present for %s", vc.Key())
-	} else {
-		log.Errorf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs")
-		var retList []*types.VolumeStatus
-		pub := ctx.pubVolumeStatus
-		items := pub.GetAll()
-		for _, st := range items {
-			status := st.(types.VolumeStatus)
-			config := lookupVolumeRefConfig(ctx, status.Key())
-			if config != nil && config.ApplicationInstanceID == vrc.ApplicationInstanceID {
-				retList = append(retList, &status)
-			}
-		}
-		log.Errorf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs: Done")
-		return retList
+	if vc.ApplicationID == uuid.Nil {
+		return nil
 	}
-	return nil
+	log.Errorf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs")
+	var retList []*types.VolumeStatus
+	pub := ctx.pubVolumeStatus
+	items := pub.GetAll()
+	for _, st := range items {
+		status := st.(types.VolumeStatus)
+		config := lookupVolumeConfig(ctx, status.Key())
+		if config != nil && config.ApplicationID == vc.ApplicationID {
+			retList = append(retList, &status)
+		}
+	}
+	log.Errorf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs: Done")
+	return retList
 }
 
 func maybeDeleteVolume(ctx *volumemgrContext, status *types.VolumeStatus) {
