@@ -99,6 +99,7 @@ func (config VolumeConfig) LogKey() string {
 type VolumeStatus struct {
 	VolumeID                uuid.UUID
 	ContentID               uuid.UUID
+	ApplicationID           uuid.UUID
 	VolumeContentOriginType zconfig.VolumeContentOriginType
 	MaxVolSize              uint64
 	ReadOnly                bool

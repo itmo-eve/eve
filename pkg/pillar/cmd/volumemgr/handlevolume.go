@@ -5,12 +5,12 @@ package volumemgr
 
 import (
 	"fmt"
-	uuid "github.com/satori/go.uuid"
 	"os"
 	"time"
 
 	"github.com/lf-edge/eve/pkg/pillar/types"
 	"github.com/lf-edge/eve/pkg/pillar/utils"
+	uuid "github.com/satori/go.uuid"
 )
 
 func handleVolumeCreate(ctxArg interface{}, key string,
@@ -26,6 +26,7 @@ func handleVolumeCreate(ctxArg interface{}, key string,
 	status = &types.VolumeStatus{
 		VolumeID:                config.VolumeID,
 		ContentID:               config.ContentID,
+		ApplicationID:           config.ApplicationID,
 		VolumeContentOriginType: config.VolumeContentOriginType,
 		MaxVolSize:              config.MaxVolSize,
 		ReadOnly:                config.ReadOnly,
@@ -64,18 +65,17 @@ func handleVolumeCreate(ctxArg interface{}, key string,
 	}
 	publishVolumeStatus(ctx, status)
 	if !ctx.globalConfig.GlobalValueBool(types.IgnoreDiskCheckForApps) {
-		var purgable uint64
+		var purgeable uint64
 		statuses := lookupVolumesStatusesWithTheSameAI(ctx, &config)
 		for _, st := range statuses {
-			log.Errorf("handleVolumeCreate(%s) status obtained: %v", key, st)
 			if st.State >= types.CREATED_VOLUME {
 				// we add MaxVolSize inside getRemainingDiskSpace, so here we can substract the diff
 				// taking into account, that we will purge disks soon, because we receive new volume when another ones
 				// are already created
-				purgable += st.MaxVolSize - uint64(st.CurrentSize)
+				purgeable += st.MaxVolSize - uint64(st.CurrentSize)
 			}
 		}
-		log.Errorf("handleVolumeCreate(%s) purgable: %d", key, purgable)
+		log.Noticef("handleVolumeCreate(%s) purgeable: %d", key, purgeable)
 		// Check disk usage
 		remaining, err := getRemainingDiskSpace(ctx)
 		if err != nil {
@@ -88,7 +88,7 @@ func handleVolumeCreate(ctxArg interface{}, key string,
 				log.Errorf("handleVolumeCreate(%s): exception while publishing diskmetric. %s", key, err.Error())
 			}
 			return
-		} else if remaining-purgable < status.MaxVolSize {
+		} else if remaining-purgeable < status.MaxVolSize {
 			errStr := fmt.Sprintf("Remaining disk space %d volume needs %d\n",
 				remaining, status.MaxVolSize)
 			status.SetError(errStr, time.Now())
@@ -241,18 +241,17 @@ func lookupVolumesStatusesWithTheSameAI(ctx *volumemgrContext, vc *types.VolumeC
 	if vc.ApplicationID == uuid.Nil {
 		return nil
 	}
-	log.Errorf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs")
+	log.Errorf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameAI")
 	var retList []*types.VolumeStatus
 	pub := ctx.pubVolumeStatus
 	items := pub.GetAll()
 	for _, st := range items {
 		status := st.(types.VolumeStatus)
-		config := lookupVolumeConfig(ctx, status.Key())
-		if config != nil && config.ApplicationID == vc.ApplicationID {
+		if status.ApplicationID == vc.ApplicationID {
 			retList = append(retList, &status)
 		}
 	}
-	log.Errorf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameRefs: Done")
+	log.Errorf("getAllVolumeStatus for lookupVolumesStatusesWithTheSameAI: Done")
 	return retList
 }
 
