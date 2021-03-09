@@ -14,10 +14,10 @@ RUN apk add --no-cache --initdb \
         musl-dev=1.1.24-r10 \
         git=2.26.2-r0 \
         linux-headers=5.4.5-r1 \
-        curl=7.69.1-r1 \
+        curl=7.69.1-r3 \
         bash=5.0.17-r0 \
         pkgconf=1.7.2-r0 \
-        libseccomp-dev=2.4.3-r0
+        libseccomp-dev=2.4.4-r0
 
 WORKDIR /k3s
 RUN git clone -b ${K3SVER} --depth 1 https://github.com/rancher/k3s.git .
