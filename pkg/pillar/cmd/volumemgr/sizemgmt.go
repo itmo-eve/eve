@@ -39,11 +39,12 @@ func getRemainingDiskSpace(ctxPtr *volumemgrContext) (uint64, error) {
 			continue
 		}
 		cfg := lookupVolumeConfig(ctxPtr, iterVolumeStatus.Key())
-		if cfg != nil && !cfg.ReadOnly {
+		if cfg != nil && !cfg.ReadOnly && !cfg.Stale {
 			totalDiskSize += iterVolumeStatus.MaxVolSize
 		} else {
 			// we have no config with this volume, so it will purged soon
 			// or it is ReadOnly and will not grow
+			// or it is stale without apps pointing onto it in new config
 			totalDiskSize += uint64(iterVolumeStatus.CurrentSize)
 		}
 	}
