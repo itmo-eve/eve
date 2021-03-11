@@ -304,10 +304,11 @@ func (status DomainStatus) LogKey() string {
 }
 
 type VifInfo struct {
-	Bridge  string
-	Vif     string
-	VifUsed string // Has -emu in name in Status if appropriate
-	Mac     string
+	Bridge       string
+	BridgeIPAddr string
+	Vif          string
+	VifUsed      string // Has -emu in name in Status if appropriate
+	Mac          string
 }
 
 // DomainManager will pass these to the xen xl config file

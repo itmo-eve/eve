@@ -8,7 +8,10 @@ import (
 	"github.com/lf-edge/eve/pkg/pillar/containerd"
 	"github.com/lf-edge/eve/pkg/pillar/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -74,12 +77,31 @@ func (ctx ctrdContext) Setup(status types.DomainStatus, config types.DomainConfi
 	if err != nil {
 		return logError("setting up OCI spec for domain %s failed %v", status.DomainName, err)
 	}
-	spec.Get().Mounts = append(spec.Get().Mounts, specs.Mount{
-		Type:        "bind",
-		Source:      "/etc/resolv.conf",
-		Destination: "/etc/resolv.conf",
-		Options:     []string{"rbind", "ro"}})
-
+	// create resolve.conf
+	lines := []string{}
+	for _, el := range config.VifList {
+		if el.BridgeIPAddr != "" {
+			lines = append(lines, fmt.Sprintf("nameserver %s", el.BridgeIPAddr))
+		}
+	}
+	if len(lines) > 0 {
+		resolvePath := filepath.Join(status.OCIConfigDir, "resolve.conf")
+		if err := ioutil.WriteFile(resolvePath,
+			[]byte(strings.Join(lines, "\n")), 0644); err != nil {
+			return err
+		}
+		spec.Get().Mounts = append(spec.Get().Mounts, specs.Mount{
+			Type:        "bind",
+			Source:      resolvePath,
+			Destination: "/etc/resolv.conf",
+			Options:     []string{"rbind", "ro"}})
+	} else {
+		spec.Get().Mounts = append(spec.Get().Mounts, specs.Mount{
+			Type:        "bind",
+			Source:      "/etc/resolv.conf",
+			Destination: "/etc/resolv.conf",
+			Options:     []string{"rbind", "ro"}})
+	}
 	if err := spec.CreateContainer(true); err != nil {
 		return logError("Failed to create container for task %s from %v: %v", status.DomainName, config, err)
 	}
