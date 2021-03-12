@@ -8,13 +8,15 @@ import (
 	"github.com/lf-edge/eve/pkg/pillar/containerd"
 	"github.com/lf-edge/eve/pkg/pillar/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	vifsDir string = "/run/tasks/vifs"
 )
 
 type ctrdContext struct {
@@ -77,31 +79,22 @@ func (ctx ctrdContext) Setup(status types.DomainStatus, config types.DomainConfi
 	if err != nil {
 		return logError("setting up OCI spec for domain %s failed %v", status.DomainName, err)
 	}
-	// create resolve.conf
-	lines := []string{}
-	for _, el := range config.VifList {
-		if el.BridgeIPAddr != "" {
-			lines = append(lines, fmt.Sprintf("nameserver %s", el.BridgeIPAddr))
-		}
+
+	filename := filepath.Join(vifsDir, status.DomainName, "etc", "resolv.conf")
+	err = os.MkdirAll(filepath.Dir(filename), 0755)
+	if err != nil {
+		return logError("Failed to create directory for vifs task %s with err: %s", filepath.Dir(filename), err)
 	}
-	if len(lines) > 0 {
-		resolvePath := filepath.Join(status.OCIConfigDir, "resolve.conf")
-		if err := ioutil.WriteFile(resolvePath,
-			[]byte(strings.Join(lines, "\n")), 0644); err != nil {
-			return err
-		}
-		spec.Get().Mounts = append(spec.Get().Mounts, specs.Mount{
-			Type:        "bind",
-			Source:      resolvePath,
-			Destination: "/etc/resolv.conf",
-			Options:     []string{"rbind", "ro"}})
-	} else {
-		spec.Get().Mounts = append(spec.Get().Mounts, specs.Mount{
-			Type:        "bind",
-			Source:      "/etc/resolv.conf",
-			Destination: "/etc/resolv.conf",
-			Options:     []string{"rbind", "ro"}})
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_SYNC, 0755)
+	if err != nil {
+		return logError("Failed creating empty resolv.conf file %s with err: %s", filename, err)
 	}
+	defer f.Close()
+	spec.Get().Mounts = append(spec.Get().Mounts, specs.Mount{
+		Type:        "bind",
+		Source:      filename,
+		Destination: "/etc/resolv.conf",
+		Options:     []string{"rbind", "ro"}})
 	if err := spec.CreateContainer(true); err != nil {
 		return logError("Failed to create container for task %s from %v: %v", status.DomainName, config, err)
 	}
@@ -150,7 +143,14 @@ func (ctx ctrdContext) Stop(domainName string, domainID int, force bool) error {
 func (ctx ctrdContext) Delete(domainName string, domainID int) error {
 	ctrdCtx, done := ctx.ctrdClient.CtrNewUserServicesCtx()
 	defer done()
-	return ctx.ctrdClient.CtrDeleteContainer(ctrdCtx, domainName)
+	if err := ctx.ctrdClient.CtrDeleteContainer(ctrdCtx, domainName); err != nil {
+		return err
+	}
+	vifs := filepath.Join(vifsDir, domainName)
+	if err := os.RemoveAll(vifs); err != nil {
+		return logError("cannot clear vifs task dir %s: %v", vifs, err)
+	}
+	return nil
 }
 
 func (ctx ctrdContext) Annotations(domainName string, domainID int) (map[string]string, error) {

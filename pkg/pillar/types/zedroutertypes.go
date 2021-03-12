@@ -1767,6 +1767,7 @@ type UnderlayNetworkStatus struct {
 	ACLs int // drop ACLs field from UnderlayNetworkConfig
 	VifInfo
 	BridgeMac       net.HardwareAddr
+	BridgeIPAddr    string // The address for DNS/DHCP service in zedrouter
 	AllocatedIPAddr string // Assigned to domU
 	Assigned        bool   // Set to true once DHCP has assigned it to domU
 	IPAddrMisMatch  bool
