@@ -46,9 +46,10 @@ func parseVolumeConfig(ctx *getconfigContext,
 
 	// First look for deleted ones
 	items := ctx.pubVolumeConfig.GetAll()
-	for idStr := range items {
+	for idStr, vc := range items {
 		found := false
-		for _, cfgVolume := range cfgVolumeList {
+		var cfgVolume *zconfig.Volume
+		for _, cfgVolume = range cfgVolumeList {
 			vKey := volumeKey(cfgVolume.GetUuid(), cfgVolume.GetGenerationCount())
 			if vKey == idStr {
 				found = true
@@ -59,6 +60,11 @@ func parseVolumeConfig(ctx *getconfigContext,
 		if !found {
 			log.Functionf("parseVolumeConfig: deleting %s\n", idStr)
 			unpublishVolumeConfig(ctx, idStr)
+		} else {
+			// check links from apps
+			volumeConfig := vc.(types.VolumeConfig)
+			volumeConfig.HasNoAppReferences = checkVolumeHasNoAppReferences(ctx, cfgVolume, config)
+			publishVolumeConfig(ctx, volumeConfig)
 		}
 	}
 
@@ -80,9 +86,35 @@ func parseVolumeConfig(ctx *getconfigContext,
 		volumeConfig.DisplayName = cfgVolume.GetDisplayName()
 		volumeConfig.ReadOnly = cfgVolume.GetReadonly()
 		volumeConfig.RefCount = 1
+		volumeConfig.HasNoAppReferences = checkVolumeHasNoAppReferences(ctx, cfgVolume, config)
 		publishVolumeConfig(ctx, *volumeConfig)
 	}
+
+	//signal publisher restarted to apply deferred changes inside volumemgr
+	signalVolumeConfigRestarted(ctx)
 	log.Tracef("parsing volume config done\n")
+}
+
+func signalVolumeConfigRestarted(ctx *getconfigContext) {
+	log.Trace("signalVolumeConfigRestarted")
+	pub := ctx.pubVolumeConfig
+	pub.SignalRestarted()
+	log.Trace("signalVolumeConfigRestarted done")
+}
+
+// checkVolumeHasNoAppReferences returns true if there are no apps using this image in new config
+func checkVolumeHasNoAppReferences(ctx *getconfigContext, cfgVolume *zconfig.Volume,
+	devConfig *zconfig.EdgeDevConfig) bool {
+
+	appInstanceList := devConfig.GetApps()
+	for _, el := range appInstanceList {
+		for _, vr := range el.VolumeRefList {
+			if vr.Uuid == cfgVolume.GetUuid() {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func publishVolumeConfig(ctx *getconfigContext,

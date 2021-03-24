@@ -1,16 +1,13 @@
 ---
 name: Eden
 on:
-  push:
-    branches: [master]
-  pull_request_review:
-    branches: [master]
-    types: [submitted]
+  pull_request:
+    branches:
+      - master
 
 jobs:
   integration:
     runs-on: ubuntu-20.04
-    if: ${{ github.event.review.state == 'approved' || github.ref == 'refs/heads/master' }}
     steps:
       - name: Check
         run: |
