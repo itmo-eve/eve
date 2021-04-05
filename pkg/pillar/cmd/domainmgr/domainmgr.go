@@ -1319,7 +1319,7 @@ func doActivateTail(ctx *domainContext, status *types.DomainStatus,
 		}
 		return
 	}
-	if err == nil && domainID != status.DomainId {
+	if domainID != status.DomainId {
 		status.DomainId = domainID
 		status.BootTime = time.Now()
 		log.Noticef("Update domainId %d bootTime %s for %s",
@@ -1352,8 +1352,9 @@ func doInactivate(ctx *domainContext, status *types.DomainStatus, impatient bool
 		maxDelay /= 10
 	}
 
-	firstDelay := maxDelay
+	shortDelay := maxDelay
 	doShutdown := false // shutdown for particular VirtualizationModes
+	domainGone := false
 
 	switch status.VirtualizationMode {
 	case types.HVM, types.FML:
@@ -1361,7 +1362,7 @@ func doInactivate(ctx *domainContext, status *types.DomainStatus, impatient bool
 
 		// Do a short shutdown wait, just in case there are
 		// PV tools in guest, then a shutdown -F
-		firstDelay = time.Second * 60
+		shortDelay = time.Second * 60
 	case types.PV:
 		doShutdown = true
 	}
@@ -1380,14 +1381,14 @@ func doInactivate(ctx *domainContext, status *types.DomainStatus, impatient bool
 				// Wait for the domain to go away
 				log.Functionf("doInactivate(%v) for %s: waiting for domain to shutdown",
 					status.UUIDandVersion, status.DisplayName)
-				gone := waitForDomainGone(*status, firstDelay)
+				gone := waitForDomainGone(*status, shortDelay)
 				if gone {
-					status.DomainId = 0
+					domainGone = true
 				}
 			}
 		}
 	}
-	if status.DomainId != 0 && doShutdown {
+	if !domainGone && doShutdown {
 		// This often fails with "X is an invalid domain identifier (rc=-6)"
 		// due to the DomainShutdown above, in which case
 		// the domain is already on the way down.
@@ -1404,29 +1405,28 @@ func doInactivate(ctx *domainContext, status *types.DomainStatus, impatient bool
 				status.UUIDandVersion, status.DisplayName)
 			gone := waitForDomainGone(*status, maxDelay)
 			if gone {
-				status.DomainId = 0
+				domainGone = true
 			}
 		}
 	}
 
-	if status.DomainId != 0 {
-		if err := hyper.Task(status).Delete(status.DomainName, status.DomainId); err != nil {
-			log.Errorf("Failed to delete domain %s (%v)", status.DomainName, err)
-		} else {
-			log.Functionf("doInactivate(%v) for %s: Delete succeeded",
-				status.UUIDandVersion, status.DisplayName)
-		}
-		// Even if Delete failed we wait
-		log.Functionf("doInactivate(%v) for %s: waiting for domain to be destroyed",
+	if err := hyper.Task(status).Delete(status.DomainName, status.DomainId); err != nil {
+		log.Warnf("Failed to delete domain %s (%v)", status.DomainName, err)
+	} else {
+		log.Functionf("doInactivate(%v) for %s: Delete succeeded",
 			status.UUIDandVersion, status.DisplayName)
-		gone := waitForDomainGone(*status, maxDelay)
-		if gone {
-			status.DomainId = 0
-		}
+	}
+
+	// Even if Delete failed we wait
+	log.Functionf("doInactivate(%v) for %s: waiting for domain to be destroyed",
+		status.UUIDandVersion, status.DisplayName)
+	gone := waitForDomainGone(*status, shortDelay)
+	if gone {
+		domainGone = true
 	}
 
 	// If everything failed we leave it marked as Activated
-	if status.DomainId != 0 {
+	if !domainGone {
 		errStr := fmt.Sprintf("doInactivate(%s) failed to halt/destroy %d",
 			status.Key(), status.DomainId)
 		log.Error(errStr)
@@ -1435,6 +1435,7 @@ func doInactivate(ctx *domainContext, status *types.DomainStatus, impatient bool
 			status.SetErrorNow(errStr)
 		}
 	} else {
+		status.DomainId = 0
 		status.Activated = false
 		status.State = types.HALTED
 	}
