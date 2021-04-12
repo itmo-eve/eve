@@ -6,7 +6,6 @@ package types
 import (
 	"fmt"
 	uuid "github.com/satori/go.uuid"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -187,7 +186,7 @@ const (
 
 // Task represents any runnable entity on EVE
 type Task interface {
-	Setup(DomainStatus, DomainConfig, *AssignableAdapters, *os.File) error
+	Setup(DomainStatus, DomainConfig, *AssignableAdapters, string) error
 	Create(string, string, *DomainConfig) (int, error)
 	Start(string, int) error
 	Stop(string, int, bool) error

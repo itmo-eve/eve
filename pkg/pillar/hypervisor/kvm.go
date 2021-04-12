@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -390,13 +391,35 @@ func (ctx kvmContext) Task(status *types.DomainStatus) types.Task {
 	}
 }
 
-func (ctx kvmContext) Setup(status types.DomainStatus, config types.DomainConfig, aa *types.AssignableAdapters, file *os.File) error {
+func (ctx kvmContext) Setup(status types.DomainStatus, config types.DomainConfig, aa *types.AssignableAdapters, file string) error {
 
 	diskStatusList := status.DiskStatusList
 	domainName := status.DomainName
 	// first lets build the domain config
-	if err := ctx.CreateDomConfig(domainName, config, diskStatusList, aa, file); err != nil {
-		return logError("failed to build domain config: %v", err)
+	overwiteFile := file + ".overwrite"
+	_, err := os.Stat(overwiteFile)
+	if os.IsNotExist(err) {
+		f, err := os.Create(file)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		if err := ctx.CreateDomConfig(domainName, config, diskStatusList, aa, f); err != nil {
+			return logError("failed to build domain config: %v", err)
+		}
+	} else {
+		data, err := ioutil.ReadFile(overwiteFile)
+		if err != nil {
+			return err
+		}
+		oldNameSplitted := strings.Split(domainName, ".")
+		oldName := strings.Join(oldNameSplitted[:len(oldNameSplitted)-2], ".")
+		r := regexp.MustCompile(fmt.Sprintf(`%s\.[0-9]+\.[0-9]`, oldName))
+		res := r.ReplaceAllString(string(data), domainName)
+		err = ioutil.WriteFile(file, []byte(res), 0644)
+		if err != nil {
+			return err
+		}
 	}
 
 	dmArgs := ctx.dmArgs
@@ -411,7 +434,7 @@ func (ctx kvmContext) Setup(status types.DomainStatus, config types.DomainConfig
 	args := []string{ctx.dmExec}
 	args = append(args, dmArgs...)
 	args = append(args, "-name", domainName,
-		"-readconfig", file.Name(),
+		"-readconfig", file,
 		"-pidfile", kvmStateDir+domainName+"/pid")
 
 	spec, err := ctx.setupSpec(&status, &config, status.OCIConfigDir)

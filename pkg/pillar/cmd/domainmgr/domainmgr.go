@@ -1199,13 +1199,8 @@ func doActivate(ctx *domainContext, config types.DomainConfig,
 	}
 
 	filename := xenCfgFilename(config.AppNum)
-	file, err := os.Create(filename)
-	if err != nil {
-		log.Fatal("os.Create for ", filename, err)
-	}
-	defer file.Close()
 
-	if err := hyper.Task(status).Setup(*status, config, ctx.assignableAdapters, file); err != nil {
+	if err := hyper.Task(status).Setup(*status, config, ctx.assignableAdapters, filename); err != nil {
 		log.Errorf("Failed to create DomainStatus from %v: %s",
 			config, err)
 		status.SetErrorNow(err.Error())

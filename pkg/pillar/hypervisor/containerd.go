@@ -8,7 +8,6 @@ import (
 	"github.com/lf-edge/eve/pkg/pillar/containerd"
 	"github.com/lf-edge/eve/pkg/pillar/types"
 	"github.com/opencontainers/runtime-spec/specs-go"
-	"os"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -65,7 +64,7 @@ func (ctx ctrdContext) setupSpec(status *types.DomainStatus, config *types.Domai
 	return spec, nil
 }
 
-func (ctx ctrdContext) Setup(status types.DomainStatus, config types.DomainConfig, aa *types.AssignableAdapters, file *os.File) error {
+func (ctx ctrdContext) Setup(status types.DomainStatus, config types.DomainConfig, aa *types.AssignableAdapters, file string) error {
 	if status.OCIConfigDir == "" {
 		return logError("failed to run domain %s: not based on an OCI image", status.DomainName)
 	}

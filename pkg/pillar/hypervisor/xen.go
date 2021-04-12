@@ -71,10 +71,28 @@ func (ctx xenContext) Task(status *types.DomainStatus) types.Task {
 	}
 }
 
-func (ctx xenContext) Setup(status types.DomainStatus, config types.DomainConfig, aa *types.AssignableAdapters, file *os.File) error {
+func (ctx xenContext) Setup(status types.DomainStatus, config types.DomainConfig, aa *types.AssignableAdapters, file string) error {
 	// first lets build the domain config
-	if err := ctx.CreateDomConfig(status.DomainName, config, status.DiskStatusList, aa, file); err != nil {
-		return logError("failed to build domain config: %v", err)
+	overwiteFile := file + ".overwrite"
+	_, err := os.Stat(overwiteFile)
+	if os.IsNotExist(err) {
+		f, err := os.Create(file)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		if err := ctx.CreateDomConfig(status.DomainName, config, status.DiskStatusList, aa, f); err != nil {
+			return logError("failed to build domain config: %v", err)
+		}
+	} else {
+		data, err := ioutil.ReadFile(overwiteFile)
+		if err != nil {
+			return err
+		}
+		err = ioutil.WriteFile(file, data, 0644)
+		if err != nil {
+			return err
+		}
 	}
 
 	spec, err := ctx.setupSpec(&status, &config, status.OCIConfigDir)
@@ -86,7 +104,7 @@ func (ctx xenContext) Setup(status types.DomainStatus, config types.DomainConfig
 	}
 
 	// finally we can start it up
-	spec.Get().Process.Args = []string{"/etc/xen/scripts/xen-start", status.DomainName, file.Name()}
+	spec.Get().Process.Args = []string{"/etc/xen/scripts/xen-start", status.DomainName, file}
 	if err := spec.CreateContainer(true); err != nil {
 		return logError("Failed to create container for task %s from %v: %v", status.DomainName, config, err)
 	}
