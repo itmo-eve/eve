@@ -266,6 +266,14 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 		log.Fatal(err)
 	}
 
+	capabilitiesInfoPub, err := ps.NewPublication(pubsub.PublicationOptions{
+		AgentName: agentName,
+		TopicType: types.Capabilities{},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Look for controller certs which will be used for decryption
 	subControllerCert, err := ps.NewSubscription(pubsub.SubscriptionOptions{
 		AgentName:   "zedagent",
@@ -533,6 +541,7 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 	domainCtx.subDomainConfig = subDomainConfig
 	subDomainConfig.Activate()
 
+	capabilitiesSended := false
 	for {
 		select {
 		case change := <-subControllerCert.MsgChan():
@@ -564,6 +573,21 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 			}
 			ps.CheckMaxTimeTopic(agentName, "publishTimer", start,
 				warningTime, errorTime)
+			if !capabilitiesSended {
+				start = time.Now()
+				capabilities, err := hyper.GetCapabilities()
+				if err != nil {
+					log.Warnf("Cannot get capabilities: %v", err)
+				} else {
+					if err = capabilitiesInfoPub.Publish("global", *capabilities); err != nil {
+						log.Errorln(err)
+					} else {
+						capabilitiesSended = true
+					}
+				}
+				ps.CheckMaxTimeTopic(agentName, "publishTimer", start,
+					warningTime, errorTime)
+			}
 			start = time.Now()
 			metrics, pids := gatherProcessMetricList(&domainCtx)
 			for _, m := range metrics {
@@ -1579,6 +1603,14 @@ func configAdapters(ctx *domainContext, config types.DomainConfig) error {
 
 	defer ctx.publishAssignableAdapters()
 
+	hasIOVirtualization := true
+	c, err := hyper.GetCapabilities()
+	if err != nil {
+		logrus.Errorf("cannot check capabilities: %v", err)
+	} else {
+		hasIOVirtualization = c.IOVirtualization
+	}
+
 	for _, adapter := range config.IoAdapterList {
 		log.Functionf("configAdapters processing adapter %d %s",
 			adapter.Type, adapter.Name)
@@ -1612,6 +1644,10 @@ func configAdapters(ctx *domainContext, config types.DomainConfig) error {
 		for _, ibp := range list {
 			if ibp == nil {
 				continue
+			}
+			if ibp.PciLong != "" && !hasIOVirtualization {
+				return fmt.Errorf("no I/O virtualization support: adapter %d %s member %s cannot be assigned",
+					adapter.Type, adapter.Name, ibp.Phylabel)
 			}
 			log.Tracef("configAdapters setting uuid %s for adapter %d %s member %s",
 				config.Key(), adapter.Type, adapter.Name, ibp.Phylabel)
