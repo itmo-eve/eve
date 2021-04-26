@@ -42,7 +42,6 @@ COPY i386-softmmu.mak default-configs/devices/i386-softmmu.mak
 COPY meson.build hw/acpi/meson.build
 
 RUN patch -p1 < /0003-vhost-nvme.patch
-RUN patch -p1 < /0004-vhost-nvme-kernel.patch
 
 # systemtap is not available on Alpine, so we're putting together dtrace tooling
 # by hand. More instruction on qemu systemtap probes here:

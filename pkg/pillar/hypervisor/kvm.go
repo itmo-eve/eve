@@ -244,29 +244,19 @@ const qemuDiskTemplate = `
   bus = "pcie.0"
   addr = "{{.PCIId}}"
 
-[drive "drive-virtio-disk{{.DiskID}}"]
+[drive "vhost-kernel-nvme"]
   file = "{{.FileLocation}}"
-  format = "{{.Format | Fmt}}"
-  aio = "{{.AioType}}"
-  cache = "writeback"
+  format = "raw"
+  id = "disk1"
   if = "none"
-{{if .ReadOnly}}  readonly = "on"{{end}}
-{{- if eq .Devtype "legacy"}}
-[device "ahci.{{.PCIId}}"]
-  bus = "pci.{{.PCIId}}"
-  driver = "ahci"
 
-[device "ahci-disk{{.DiskID}}"]
-  driver = "ide-hd"
-  bus = "ahci.{{.PCIId}}.0"
-{{- else}}
-[device "virtio-disk{{.DiskID}}"]
-  driver = "virtio-blk-pci"
-  scsi = "off"
-  bus = "pci.{{.PCIId}}"
-  addr = "0x0"
-{{- end}}
-  drive = "drive-virtio-disk{{.DiskID}}"
+{{if .ReadOnly}}  readonly = "on"{{end}}
+[device "vhost-kernel-nvme{{.DiskID}}"]
+  serial = "TestNvmeVhostQemu"
+  id = "nvme0"
+  drive = "disk1"
+  driver = "vhost-kernel-nvme"
+
 {{end}}`
 
 const qemuNetTemplate = `

@@ -41,7 +41,7 @@ func createVdiskVolume(ctx *volumemgrContext, status types.VolumeStatus,
 		log.Error(errStr)
 		return created, "", errors.New(errStr)
 	}
-
+	//
 	// use the edge-containers library to extract the data we need
 	puller := registry.Puller{
 		Image: ref,

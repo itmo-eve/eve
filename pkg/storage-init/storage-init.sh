@@ -160,6 +160,8 @@ for BLK_DEVICE in $BLK_DEVICES; do
     fi
 done
 
+modprobe null_blk queue_mode=0 gb=1000 bs=4096 irqmode=0 nr_devices=1
+
 #Recording SMART details to a file
 SMART_JSON=$(smartctl -a "$(grep -m 1 /persist < /proc/mounts | cut -d ' ' -f 1)" --json)
 if [ -f "$SMART_DETAILS_PREVIOUS_FILE" ];
