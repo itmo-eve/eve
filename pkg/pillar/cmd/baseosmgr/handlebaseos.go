@@ -86,7 +86,7 @@ func baseOsHandleStatusUpdateUUID(ctx *baseOsMgrContext, id string) {
 	log.Functionf("baseOsHandleStatusUpdateUUID for %s", id)
 	config := lookupBaseOsConfig(ctx, id)
 	if config == nil {
-		log.Errorf("baseOsHandleStatusUpdateUUID(%s) config not found", id)
+		log.Functionf("baseOsHandleStatusUpdateUUID(%s) config not found", id)
 		return
 	}
 	status := lookupBaseOsStatus(ctx, id)

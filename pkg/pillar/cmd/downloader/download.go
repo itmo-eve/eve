@@ -78,9 +78,8 @@ func download(ctx *downloaderContext, trType zedUpload.SyncTransportType,
 	go func() {
 		<-cancelChan
 		cancel = true
-		errStr := fmt.Sprintf("cancelled by user: <%s>, <%s>, <%s>",
+		log.Functionf("cancelled by user: <%s>, <%s>, <%s>",
 			dpath, region, filename)
-		log.Error(errStr)
 		req.Cancel()
 	}()
 
