@@ -1109,6 +1109,12 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 	// XXX close handleChannels?
 	getconfigCtx.configTickerHandle = configTickerHandle
 
+	// start the local profile fetch tasks
+	log.Functionf("Creating %s at %s", "localProfileTimerTask", agentlog.GetMyStack())
+	go localProfileTimerTask(handleChannel, &getconfigCtx)
+	localProfileTickerHandle := <-handleChannel
+	getconfigCtx.localProfileTickerHandle = localProfileTickerHandle
+
 	// start cipher module tasks
 	cipherModuleStart(&zedagentCtx)
 

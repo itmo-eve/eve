@@ -91,6 +91,7 @@ func parseConfig(config *zconfig.EdgeDevConfig, getconfigCtx *getconfigContext,
 		parseNetworkInstanceConfig(config, getconfigCtx)
 		parseContentInfoConfig(getconfigCtx, config)
 		parseVolumeConfig(getconfigCtx, config)
+		parseProfile(getconfigCtx, config)
 		parseAppInstanceConfig(config, getconfigCtx)
 		getconfigCtx.lastProcessedConfig = time.Now()
 	}
@@ -424,6 +425,8 @@ func parseAppInstanceConfig(config *zconfig.EdgeDevConfig,
 	configHash := h.Sum(nil)
 	same := bytes.Equal(configHash, appinstancePrevConfigHash)
 	if same {
+		// we need to apply filter in case of no changes in apps itself
+		filterAndPublishAppInstancesWithCurrentProfile(getconfigCtx)
 		return
 	}
 	log.Functionf("parseAppInstanceConfig: Applying updated config "+
@@ -512,6 +515,8 @@ func parseAppInstanceConfig(config *zconfig.EdgeDevConfig,
 		appInstance.RemoteConsole = cfgApp.GetRemoteConsole()
 		appInstance.CipherBlockStatus = parseCipherBlock(getconfigCtx, appInstance.Key(),
 			cfgApp.GetCipherData())
+		appInstance.ProfileList = cfgApp.ProfileList
+		appInstance.ControllerActivateState = cfgApp.Activate
 
 		// Verify that it fits and if not publish with error
 		checkAndPublishAppInstanceConfig(getconfigCtx, appInstance)
@@ -1625,6 +1630,7 @@ func parseConfigItems(config *zconfig.EdgeDevConfig, ctx *getconfigContext) {
 			log.Functionf("parseConfigItems: %s change from %d to %d",
 				"ConfigInterval", oldConfigInterval, newConfigInterval)
 			updateConfigTimer(newConfigInterval, ctx.configTickerHandle)
+			updateConfigTimer(newConfigInterval, ctx.localProfileTickerHandle)
 		}
 		if newMetricInterval != oldMetricInterval {
 			log.Functionf("parseConfigItems: %s change from %d to %d",
@@ -1730,6 +1736,7 @@ func checkAndPublishAppInstanceConfig(getconfigCtx *getconfigContext,
 		}
 	}
 
+	filterAppInstanceWithCurrentProfile(&config, getconfigCtx)
 	pub.Publish(key, config)
 }
 

@@ -614,6 +614,124 @@ func SendOnIntf(ctx *ZedCloudContext, destURL string, intf string, reqlen int64,
 	return nil, nil, senderStatus, errors.New(errStr)
 }
 
+//SendLocal uses local routes to request the data
+func SendLocal(ctx *ZedCloudContext, destURL string, reqlen int64, b *bytes.Buffer) (*http.Response, []byte, error) {
+
+	log := ctx.log
+	var reqURL string
+	var isGet bool
+
+	if strings.HasPrefix(destURL, "http:") {
+		reqURL = destURL
+	} else {
+		if strings.HasPrefix(destURL, "https:") {
+			reqURL = destURL
+		} else {
+			reqURL = "https://" + destURL
+		}
+	}
+
+	if b == nil {
+		isGet = true
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: ctx.TlsConfig,
+	}
+	// Since we recreate the transport on each call there is no benefit
+	// to keeping the connections open.
+	defer transport.CloseIdleConnections()
+
+	var errorList []error
+	var ipSrc net.IP
+	// Try all addresses
+	localTCPAddr := net.TCPAddr{IP: ipSrc}
+	localUDPAddr := net.UDPAddr{IP: ipSrc}
+	resolverDial := func(ctx context.Context, network, address string) (net.Conn, error) {
+		log.Tracef("resolverDial %v %v", network, address)
+		// XXX can we fallback to TCP? Would get a mismatched address if we do
+		d := net.Dialer{LocalAddr: &localUDPAddr}
+		return d.Dial(network, address)
+	}
+	r := net.Resolver{Dial: resolverDial, PreferGo: true,
+		StrictErrors: false}
+	d := net.Dialer{Resolver: &r, LocalAddr: &localTCPAddr}
+	transport.Dial = d.Dial
+
+	client := &http.Client{Transport: transport}
+	if ctx.NetworkSendTimeout != 0 {
+		client.Timeout = time.Duration(ctx.NetworkSendTimeout) * time.Second
+	}
+
+	var req *http.Request
+	var err error
+
+	if b != nil {
+		req, err = http.NewRequest("POST", reqURL, b)
+	} else {
+		req, err = http.NewRequest("GET", reqURL, nil)
+	}
+	if err != nil {
+		log.Errorf("NewRequest failed %s\n", err)
+		errorList = append(errorList, err)
+	}
+
+	// Add a per-request UUID to the HTTP Header
+	// for tracability in the receiver
+	req.Header.Add("X-Request-Id", uuid.NewV4().String())
+
+	trace := &httptrace.ClientTrace{
+		GotConn: func(connInfo httptrace.GotConnInfo) {
+			log.Tracef("Got RemoteAddr: %+v, LocalAddr: %+v\n",
+				connInfo.Conn.RemoteAddr(),
+				connInfo.Conn.LocalAddr())
+		},
+		DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
+			log.Tracef("DNS Info: %+v\n", dnsInfo)
+		},
+		DNSStart: func(dnsInfo httptrace.DNSStartInfo) {
+			log.Tracef("DNS start: %+v\n", dnsInfo)
+		},
+	}
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(),
+		trace))
+	log.Tracef("SendLocal: req method %s, isget %v, url %s",
+		req.Method, isGet, reqURL)
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Errorf("client.Do (timeout %d) fail: %v",
+			ctx.NetworkSendTimeout, err)
+		errorList = append(errorList, err)
+		errStr := fmt.Sprintf("All attempts to connect to %s failed: %v", reqURL, errorList)
+		log.Errorln(errStr)
+		return nil, nil, errors.New(errStr)
+	}
+
+	contents, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		resp.Body.Close()
+		resp.Body = nil
+		errorList = append(errorList, err)
+		errStr := fmt.Sprintf("ReadAll failed: %v", errorList)
+		return nil, nil, errors.New(errStr)
+	}
+	resp.Body.Close()
+	resp.Body = nil
+
+	switch resp.StatusCode {
+	case http.StatusOK, http.StatusCreated, http.StatusNotModified:
+		log.Tracef("SendLocal to %s, response %s\n", reqURL, resp.Status)
+		return resp, contents, nil
+	default:
+		errStr := fmt.Sprintf("SendLocal to %s reqlen %d statuscode %d %s",
+			reqURL, reqlen, resp.StatusCode,
+			http.StatusText(resp.StatusCode))
+		log.Tracef("received response %v\n", resp)
+		// Get caller to schedule a retry based on StatusCode
+		return resp, nil, errors.New(errStr)
+	}
+}
+
 func isCertFailure(err error) (bool, *x509.Certificate) {
 	e0, ok := err.(*url.Error)
 	if !ok {

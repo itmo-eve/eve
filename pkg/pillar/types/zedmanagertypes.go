@@ -70,6 +70,10 @@ type AppInstanceConfig struct {
 	CipherBlockStatus
 
 	MetaDataType MetaDataType
+
+	// ControllerActivateState to save state from controller
+	ControllerActivateState bool
+	ProfileList             []string
 }
 
 type AppInstanceOpsCmd struct {
