@@ -425,8 +425,6 @@ func parseAppInstanceConfig(config *zconfig.EdgeDevConfig,
 	configHash := h.Sum(nil)
 	same := bytes.Equal(configHash, appinstancePrevConfigHash)
 	if same {
-		// we need to apply filter in case of no changes in apps itself
-		filterAndPublishAppInstancesWithCurrentProfile(getconfigCtx)
 		return
 	}
 	log.Functionf("parseAppInstanceConfig: Applying updated config "+
@@ -516,7 +514,6 @@ func parseAppInstanceConfig(config *zconfig.EdgeDevConfig,
 		appInstance.CipherBlockStatus = parseCipherBlock(getconfigCtx, appInstance.Key(),
 			cfgApp.GetCipherData())
 		appInstance.ProfileList = cfgApp.ProfileList
-		appInstance.ControllerActivateState = cfgApp.Activate
 
 		// Verify that it fits and if not publish with error
 		checkAndPublishAppInstanceConfig(getconfigCtx, appInstance)
@@ -1736,7 +1733,6 @@ func checkAndPublishAppInstanceConfig(getconfigCtx *getconfigContext,
 		}
 	}
 
-	filterAppInstanceWithCurrentProfile(&config, getconfigCtx)
 	pub.Publish(key, config)
 }
 

@@ -615,7 +615,7 @@ func SendOnIntf(ctx *ZedCloudContext, destURL string, intf string, reqlen int64,
 }
 
 //SendLocal uses local routes to request the data
-func SendLocal(ctx *ZedCloudContext, destURL string, reqlen int64, b *bytes.Buffer) (*http.Response, []byte, error) {
+func SendLocal(ctx *ZedCloudContext, destURL string, ipSrc net.IP, reqlen int64, b *bytes.Buffer) (*http.Response, []byte, error) {
 
 	log := ctx.log
 	var reqURL string
@@ -643,7 +643,6 @@ func SendLocal(ctx *ZedCloudContext, destURL string, reqlen int64, b *bytes.Buff
 	defer transport.CloseIdleConnections()
 
 	var errorList []error
-	var ipSrc net.IP
 	// Try all addresses
 	localTCPAddr := net.TCPAddr{IP: ipSrc}
 	localUDPAddr := net.UDPAddr{IP: ipSrc}

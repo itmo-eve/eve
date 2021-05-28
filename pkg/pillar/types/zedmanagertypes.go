@@ -71,9 +71,7 @@ type AppInstanceConfig struct {
 
 	MetaDataType MetaDataType
 
-	// ControllerActivateState to save state from controller
-	ControllerActivateState bool
-	ProfileList             []string
+	ProfileList []string
 }
 
 type AppInstanceOpsCmd struct {
@@ -163,6 +161,9 @@ type AppInstanceStatus struct {
 	State          SwState
 	MissingNetwork bool // If some Network UUID not found
 	MissingMemory  bool // Waiting for memory
+
+	EffectiveActivate bool //set here effective activate after profile set
+
 	// All error strings across all steps and all StorageStatus
 	// ErrorAndTimeWithSource provides SetError, SetErrrorWithSource, etc
 	ErrorAndTimeWithSource

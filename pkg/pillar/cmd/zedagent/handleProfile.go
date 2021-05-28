@@ -5,9 +5,11 @@ package zedagent
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -36,8 +38,7 @@ func getLocalProfileURL(localProfileServer string) (string, error) {
 }
 
 // Run a periodic fetch of the currentProfile
-func localProfileTimerTask(handleChannel chan interface{},
-	getconfigCtx *getconfigContext) {
+func localProfileTimerTask(handleChannel chan interface{}, getconfigCtx *getconfigContext) {
 
 	ctx := getconfigCtx.zedagentCtx
 	iteration := 0
@@ -52,6 +53,8 @@ func localProfileTimerTask(handleChannel chan interface{},
 			}
 		}
 		publishZedAgentStatus(getconfigCtx)
+	} else {
+		cleanSavedProtoMessage(savedLocalProfileFile)
 	}
 
 	// use ConfigInterval as localProfileInterval
@@ -74,7 +77,11 @@ func localProfileTimerTask(handleChannel chan interface{},
 	for {
 		select {
 		case <-ticker.C:
-			localProfileServer = getconfigCtx.localProfileServer
+			if localProfileServer != getconfigCtx.localProfileServer {
+				// remove saved profile on change
+				cleanSavedProtoMessage(savedLocalProfileFile)
+				localProfileServer = getconfigCtx.localProfileServer
+			}
 			if localProfileServer != "" {
 				start := time.Now()
 				iteration++
@@ -107,98 +114,120 @@ func validateAndSetLocalProfile(localProfileBytes []byte, getconfigCtx *getconfi
 		// send something to ledmanager ??
 		return fmt.Errorf("validateAndSetLocalProfile: missamtch ServerToken for loacl profile server")
 	}
-	getconfigCtx.currentProfile = localProfile.GetLocalProfile()
-	writeReceivedProtoMessageLocalProfile(localProfileBytes)
-	publishZedAgentStatus(getconfigCtx)
-	filterAndPublishAppInstancesWithCurrentProfile(getconfigCtx)
+	if getconfigCtx.currentProfile != localProfile.GetLocalProfile() {
+		log.Noticef("validateAndSetLocalProfile: profile changed from %s to %s",
+			getconfigCtx.currentProfile, localProfile.GetLocalProfile())
+		getconfigCtx.currentProfile = localProfile.GetLocalProfile()
+		writeReceivedProtoMessageLocalProfile(localProfileBytes)
+		publishZedAgentStatus(getconfigCtx)
+	}
 	return nil
 }
 
 // read saved local profile in case of particular reboot reason
 // if it is success will not read again on the next call
 func readSavedLocalProfile(getconfigCtx *getconfigContext) error {
-	if !getconfigCtx.readSavedLocalProfile && !getconfigCtx.localProfileReceived {
-		localProfile, err := readSavedProtoMessage(
-			getconfigCtx.zedagentCtx.globalConfig.GlobalValueInt(types.StaleConfigTime),
-			filepath.Join(checkpointDirname, savedLocalProfileFile), false)
-		if err != nil {
-			return fmt.Errorf("lastlocalprofile: %v", err)
-		}
-		if localProfile != nil {
-			log.Function("Using saved local profile")
-			getconfigCtx.readSavedLocalProfile = true
-			return validateAndSetLocalProfile(localProfile, getconfigCtx)
-		}
+	localProfile, err := readSavedProtoMessage(
+		getconfigCtx.zedagentCtx.globalConfig.GlobalValueInt(types.StaleConfigTime),
+		filepath.Join(checkpointDirname, savedLocalProfileFile), false)
+	if err != nil {
+		return fmt.Errorf("lastlocalprofile: %v", err)
+	}
+	if localProfile != nil {
+		log.Function("Using saved local profile")
+		getconfigCtx.readSavedLocalProfile = true
+		return validateAndSetLocalProfile(localProfile, getconfigCtx)
 	}
 	return nil
 }
 
-// getLocalProfileConfig connects to local profile server to fetch current profile
-func getLocalProfileConfig(url string, iteration int, getconfigCtx *getconfigContext) error {
+//prepareLocalProfileServerMap process configuration of network instances
+//to find match with defined localServerURL
+func prepareLocalProfileServerMap(localServerURL string, getconfigCtx *getconfigContext) (map[string]net.IP, error) {
+	res := make(map[string]net.IP)
 
-	log.Tracef("getLocalProfileConfig(%s, %d)", url, iteration)
-
-	resp, contents, err := zedcloud.SendLocal(zedcloudCtx, url, 0, nil)
+	netInstanses := getconfigCtx.pubNetworkInstanceConfig.GetAll()
+	u, err := url.Parse(localServerURL)
 	if err != nil {
-		if err := readSavedLocalProfile(getconfigCtx); err != nil {
-			return err
-		}
-		return fmt.Errorf("SendLocal: %s", err)
+		return nil, fmt.Errorf("checkAndPrepareLocalIP: url.Parse: %s", err)
 	}
-	if resp.StatusCode == http.StatusOK {
-		if err := validateProtoMessage(url, resp); err != nil {
-			// send something to ledmanager ???
-			return fmt.Errorf("getLocalProfileConfig: resp header error: %s", err)
-		}
-		getconfigCtx.localProfileReceived = true
-		return validateAndSetLocalProfile(contents, getconfigCtx)
-	}
-	return fmt.Errorf("getLocalProfileConfig: wrong response status code: %d", resp.StatusCode)
-}
-
-// filterAndPublishAppInstancesWithCurrentProfile check all app instances with currentProfile and set activate state
-func filterAndPublishAppInstancesWithCurrentProfile(getconfigCtx *getconfigContext) {
-	pub := getconfigCtx.pubAppInstanceConfig
-	items := pub.GetAll()
-	for _, c := range items {
-		config := c.(types.AppInstanceConfig)
-		oldActivate := config.Activate
-		filterAppInstanceWithCurrentProfile(&config, getconfigCtx)
-		if oldActivate != config.Activate {
-			log.Functionf("filterAppInstancesWithLocalProfile: change activate state for %s from %t to %t",
-				config.Key(), oldActivate, config.Activate)
-			if err := pub.Publish(config.Key(), config); err != nil {
-				log.Errorf("failed to publish: %s", err)
+	localProfileServerHostname := u.Hostname()
+	localProfileServerIP := net.ParseIP(localProfileServerHostname)
+	for _, entry := range netInstanses {
+		config := entry.(types.NetworkInstanceConfig)
+		if localProfileServerIP != nil {
+			//defined ip
+			if config.Subnet.Contains(localProfileServerIP) {
+				res[localServerURL] = config.Gateway
+			}
+		} else {
+			//defined host, search in DNS records
+			for _, el := range config.DnsNameToIPList {
+				if el.HostName == localProfileServerHostname {
+					for _, ip := range el.IPs {
+						localServerURLReplaced := strings.Replace(localServerURL, localProfileServerHostname,
+							ip.String(), 1)
+						res[localServerURLReplaced] = config.Gateway
+						log.Functionf(
+							"prepareLocalProfileServerMap: will use url with replaced hostname: %s",
+							localServerURLReplaced)
+					}
+				}
 			}
 		}
 	}
+	return res, nil
 }
 
-func filterAppInstanceWithCurrentProfile(config *types.AppInstanceConfig, getconfigCtx *getconfigContext) {
-	if getconfigCtx.currentProfile == "" {
-		log.Functionf("filterAppInstanceWithCurrentProfile(%s): empty current", config.Key())
-		// if currentProfile is empty set activate state from controller
-		config.Activate = config.ControllerActivateState
-		return
+// getLocalProfileConfig connects to local profile server to fetch current profile
+func getLocalProfileConfig(localServerURL string, iteration int, getconfigCtx *getconfigContext) error {
+
+	log.Tracef("getLocalProfileConfig(%s, %d)", localServerURL, iteration)
+
+	localServerMap, err := prepareLocalProfileServerMap(localServerURL, getconfigCtx)
+	if err != nil {
+		return fmt.Errorf("getLocalProfileConfig: prepareLocalProfileServerMap: %s", err)
 	}
-	if len(config.ProfileList) == 0 {
-		log.Functionf("filterAppInstanceWithCurrentProfile(%s): empty ProfileList", config.Key())
-		//we have no profile in list so we should use activate state from the controller
-		config.Activate = config.ControllerActivateState
-		return
+
+	if len(localServerMap) == 0 {
+		return fmt.Errorf(
+			"getLocalProfileConfig: cannot find any configured local subnets for localServerURL: %s",
+			localServerURL)
 	}
-	config.Activate = false
-	for _, p := range config.ProfileList {
-		if p == getconfigCtx.currentProfile {
-			log.Functionf("filterAppInstanceWithCurrentProfile(%s): profile form list (%s) match current (%s)",
-				config.Key(), p, getconfigCtx.currentProfile)
-			// activate app if currentProfile is inside ProfileList
-			config.Activate = true
-			return
+
+	var errList []string
+	for link, srcIP := range localServerMap {
+		resp, contents, err := zedcloud.SendLocal(zedcloudCtx, link, srcIP, 0, nil)
+		if err != nil {
+			errList = append(errList, fmt.Sprintf("SendLocal: %s", err))
+			continue
+		}
+		if resp.StatusCode == http.StatusOK {
+			if err := validateProtoMessage(link, resp); err != nil {
+				// send something to ledmanager ???
+				errList = append(errList, fmt.Sprintf("validateProtoMessage: resp header error: %s", err))
+				continue
+			}
+			getconfigCtx.localProfileReceived = true
+			err := validateAndSetLocalProfile(contents, getconfigCtx)
+			if err != nil {
+				errList = append(errList, fmt.Sprintf("validateAndSetLocalProfile: %s", err))
+				continue
+			} else {
+				return nil
+			}
+		}
+		errList = append(errList, fmt.Sprintf("getLocalProfileConfig: wrong response status code: %d",
+			resp.StatusCode))
+	}
+	if !getconfigCtx.readSavedLocalProfile {
+		if err := readSavedLocalProfile(getconfigCtx); err != nil {
+			errList = append(errList, fmt.Sprintf("readSavedLocalProfile: %s", err))
+		} else {
+			return nil
 		}
 	}
-	log.Functionf("filterAppInstanceWithCurrentProfile(%s): no match with current (%s)",
-		config.Key(), getconfigCtx.currentProfile)
+	return fmt.Errorf("getLocalProfileConfig: all attempts failed: %s", strings.Join(errList, ";"))
 }
 
 func writeReceivedProtoMessageLocalProfile(contents []byte) {
@@ -206,18 +235,27 @@ func writeReceivedProtoMessageLocalProfile(contents []byte) {
 }
 
 func parseProfile(ctx *getconfigContext, config *zconfig.EdgeDevConfig) {
-	log.Functionf("parseProfile start: globalProfile: %s currentProfile: %s", ctx.globalProfile, ctx.currentProfile)
+	log.Functionf("parseProfile start: globalProfile: %s currentProfile: %s",
+		ctx.globalProfile, ctx.currentProfile)
 	ctx.globalProfile = config.GlobalProfile
-	ctx.localProfileServer = config.LocalProfileServer
+	if ctx.localProfileServer != config.LocalProfileServer {
+		log.Noticef("parseProfile: LocalProfileServer changed from %s to %s",
+			ctx.localProfileServer, config.LocalProfileServer)
+		ctx.localProfileServer = config.LocalProfileServer
+	}
 	ctx.profileServerToken = config.ProfileServerToken
 	if config.LocalProfileServer == "" {
 		// if we do not use LocalProfileServer set profile to GlobalProfile
 		ctx.currentProfile = config.GlobalProfile
 	} else {
-		// try to read saved local profile actual app may be loaded later
-		if err := readSavedLocalProfile(ctx); err != nil {
-			log.Functionf("parseConfig readSavedLocalProfile: %s", err)
+		if !ctx.readSavedLocalProfile && !ctx.localProfileReceived {
+			// try to read saved local profile actual app may be loaded later
+			if err := readSavedLocalProfile(ctx); err != nil {
+				log.Functionf("parseConfig readSavedLocalProfile: %s", err)
+			}
 		}
 	}
-	log.Functionf("parseProfile done globalProfile: %s currentProfile: %s", ctx.globalProfile, ctx.currentProfile)
+	publishZedAgentStatus(ctx)
+	log.Functionf("parseProfile done globalProfile: %s currentProfile: %s",
+		ctx.globalProfile, ctx.currentProfile)
 }

@@ -399,6 +399,14 @@ func writeProtoMessage(filename string, contents []byte) {
 	}
 }
 
+// remove saved proto file if exists
+func cleanSavedProtoMessage(filename string) {
+	filename = checkpointDirname + "/" + filename
+	if err := os.Remove(filename); err != nil {
+		log.Noticef("cleanSavedProtoMessage failed: %s", err)
+	}
+}
+
 // Update modification time
 func touchProtoMessage(filename string) {
 	filename = checkpointDirname + "/" + filename
@@ -556,6 +564,7 @@ func publishZedAgentStatus(getconfigCtx *getconfigContext) {
 		BootReason:           ctx.currentBootReason,
 		MaintenanceMode:      ctx.maintenanceMode,
 		ForceFallbackCounter: ctx.forceFallbackCounter,
+		CurrentProfile:       getconfigCtx.currentProfile,
 	}
 	pub := getconfigCtx.pubZedAgentStatus
 	pub.Publish(agentName, status)
