@@ -162,7 +162,7 @@ type AppInstanceStatus struct {
 	MissingNetwork bool // If some Network UUID not found
 	MissingMemory  bool // Waiting for memory
 
-	EffectiveActivate bool //set here effective activate after profile set
+	EffectiveActivate bool //set here effective activate after profile check and apply
 
 	// All error strings across all steps and all StorageStatus
 	// ErrorAndTimeWithSource provides SetError, SetErrrorWithSource, etc

@@ -788,16 +788,16 @@ func handleZedAgentStatusImpl(ctxArg interface{}, key string,
 	ctxPtr := ctxArg.(*zedmanagerContext)
 	status := statusArg.(types.ZedAgentStatus)
 	if status.RebootCmd {
-		filterAppInstancesWithLocalProfile(ctxPtr, true)
+		updateBasedOnProfile(ctxPtr, true)
 	} else if ctxPtr.currentProfile != status.CurrentProfile {
 		ctxPtr.currentProfile = status.CurrentProfile
-		filterAppInstancesWithLocalProfile(ctxPtr, false)
+		updateBasedOnProfile(ctxPtr, false)
 	}
 	log.Functionf("handleZedAgentStatusImpl(%s) done", key)
 }
 
-// filterAppInstancesWithLocalProfile check all app instances with currentProfile and set activate state
-func filterAppInstancesWithLocalProfile(ctx *zedmanagerContext, shutdown bool) {
+// updateBasedOnProfile check all app instances with currentProfile, set EffectiveActivate and update app instances
+func updateBasedOnProfile(ctx *zedmanagerContext, shutdown bool) {
 	pub := ctx.subAppInstanceConfig
 	items := pub.GetAll()
 	for _, c := range items {
@@ -809,12 +809,12 @@ func filterAppInstancesWithLocalProfile(ctx *zedmanagerContext, shutdown bool) {
 		status := lookupAppInstanceStatus(ctx, config.Key())
 		if status != nil {
 			if status.EffectiveActivate != effectiveActivate {
-				log.Functionf("filterAppInstancesWithLocalProfile: change activate state for %s from %t to %t",
+				log.Functionf("updateBasedOnProfile: change activate state for %s from %t to %t",
 					config.Key(), status.EffectiveActivate, effectiveActivate)
 				status.EffectiveActivate = effectiveActivate
 				changed := doUpdate(ctx, config, status)
 				if changed {
-					log.Functionf("filterAppInstancesWithLocalProfile: doUpdate status change for %s", status.Key())
+					log.Functionf("updateBasedOnProfile: doUpdate status change for %s", status.Key())
 					publishAppInstanceStatus(ctx, status)
 				}
 			}

@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2021 Zededa, Inc.
+// Copyright (c) 2021 Zededa, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
 package zedagent
@@ -77,11 +77,7 @@ func localProfileTimerTask(handleChannel chan interface{}, getconfigCtx *getconf
 	for {
 		select {
 		case <-ticker.C:
-			if localProfileServer != getconfigCtx.localProfileServer {
-				// remove saved profile on change
-				cleanSavedProtoMessage(savedLocalProfileFile)
-				localProfileServer = getconfigCtx.localProfileServer
-			}
+			localProfileServer = getconfigCtx.localProfileServer
 			if localProfileServer != "" {
 				start := time.Now()
 				iteration++
@@ -91,11 +87,12 @@ func localProfileTimerTask(handleChannel chan interface{}, getconfigCtx *getconf
 				} else {
 					if err := getLocalProfileConfig(localProfileURL, iteration, getconfigCtx); err != nil {
 						log.Errorf("localProfileTimerTask getLocalProfileConfig: %s", err)
+					} else {
+						publishZedAgentStatus(getconfigCtx)
 					}
 				}
 				ctx.ps.CheckMaxTimeTopic(wdName, "getLocalProfileConfig", start,
 					warningTime, errorTime)
-				publishZedAgentStatus(getconfigCtx)
 			}
 
 		case <-stillRunning.C:
@@ -141,8 +138,10 @@ func readSavedLocalProfile(getconfigCtx *getconfigContext) error {
 	return nil
 }
 
-//prepareLocalProfileServerMap process configuration of network instances
-//to find match with defined localServerURL
+//prepareLocalProfileServerMap process configuration of network instances to find match with defined localServerURL
+//returns the srcIP for the zero or more network instances on which the locaclProfileServer might be hosted
+//based on a subnet inclusion match or hostname in dns records
+//in form actual link (with hostname replaced) -> source IP
 func prepareLocalProfileServerMap(localServerURL string, getconfigCtx *getconfigContext) (map[string]net.IP, error) {
 	res := make(map[string]net.IP)
 
@@ -156,12 +155,12 @@ func prepareLocalProfileServerMap(localServerURL string, getconfigCtx *getconfig
 	for _, entry := range netInstanses {
 		config := entry.(types.NetworkInstanceConfig)
 		if localProfileServerIP != nil {
-			//defined ip
+			//check if defined ip of localServer is on subnet
 			if config.Subnet.Contains(localProfileServerIP) {
 				res[localServerURL] = config.Gateway
 			}
 		} else {
-			//defined host, search in DNS records
+			//check if defined host is in DNS records
 			for _, el := range config.DnsNameToIPList {
 				if el.HostName == localProfileServerHostname {
 					for _, ip := range el.IPs {
@@ -220,13 +219,6 @@ func getLocalProfileConfig(localServerURL string, iteration int, getconfigCtx *g
 		errList = append(errList, fmt.Sprintf("getLocalProfileConfig: wrong response status code: %d",
 			resp.StatusCode))
 	}
-	if !getconfigCtx.readSavedLocalProfile {
-		if err := readSavedLocalProfile(getconfigCtx); err != nil {
-			errList = append(errList, fmt.Sprintf("readSavedLocalProfile: %s", err))
-		} else {
-			return nil
-		}
-	}
 	return fmt.Errorf("getLocalProfileConfig: all attempts failed: %s", strings.Join(errList, ";"))
 }
 
@@ -234,6 +226,8 @@ func writeReceivedProtoMessageLocalProfile(contents []byte) {
 	writeProtoMessage(savedLocalProfileFile, contents)
 }
 
+//parseProfile process local and global profile configuration
+//must be called before processing of app instances from config
 func parseProfile(ctx *getconfigContext, config *zconfig.EdgeDevConfig) {
 	log.Functionf("parseProfile start: globalProfile: %s currentProfile: %s",
 		ctx.globalProfile, ctx.currentProfile)
@@ -242,6 +236,10 @@ func parseProfile(ctx *getconfigContext, config *zconfig.EdgeDevConfig) {
 		log.Noticef("parseProfile: LocalProfileServer changed from %s to %s",
 			ctx.localProfileServer, config.LocalProfileServer)
 		ctx.localProfileServer = config.LocalProfileServer
+		if ctx.localProfileReceived {
+			// if we received local profile from another localProfileServer, remove it
+			cleanSavedProtoMessage(savedLocalProfileFile)
+		}
 	}
 	ctx.profileServerToken = config.ProfileServerToken
 	if config.LocalProfileServer == "" {
