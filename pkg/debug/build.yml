@@ -1,5 +1,5 @@
 image: eve-debug
-org: lfedge
+org: evecitry
 network: yes
 config:
   pid: host

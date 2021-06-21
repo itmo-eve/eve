@@ -1,5 +1,5 @@
 image: eve-watchdog
-org: lfedge
+org: evecitry
 config:
   binds:
     - /run:/run
