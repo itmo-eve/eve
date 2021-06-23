@@ -750,6 +750,14 @@ func publishBaseOsStatus(ctx *baseOsMgrContext, status *types.BaseOsStatus) {
 	pub.Publish(key, *status)
 }
 
+func publishBaseOsMgrStatus(ctx *baseOsMgrContext, status *types.BaseOSMgrStatus) {
+
+	key := status.Key()
+	log.Tracef("Publishing BaseOSMgrStatus %s", key)
+	pub := ctx.pubBaseOsMgrStatus
+	pub.Publish(key, *status)
+}
+
 func unpublishBaseOsStatus(ctx *baseOsMgrContext, key string) {
 
 	log.Tracef("Unpublishing BaseOsStatus %s", key)
@@ -824,6 +832,14 @@ func handleZbootTestComplete(ctx *baseOsMgrContext, config types.ZbootConfig,
 
 		// Check if we have a failed update which needs a kick
 		maybeRetryInstall(ctx)
+
+		ctx.currentUpdateRetry = ctx.configUpdateRetry
+
+		ctx.pubBaseOsMgrStatus.Publish(agentName,
+			&types.BaseOSMgrStatus{
+				Name:                agentName,
+				BaseosUpdateCounter: ctx.currentUpdateRetry,
+			})
 
 		log.Functionf("handleZbootTestComplete(%s) to True done",
 			config.Key())
@@ -1017,4 +1033,73 @@ func handleOtherPartRebootReason(ctxPtr *baseOsMgrContext, status *types.BaseOsS
 			dateStr)
 		status.SetError(reason, ctxPtr.rebootTime)
 	}
+}
+
+// handleUpdateRetry checks if RetryUpdateCounter changed and if so
+// set other partition state to updating
+func handleUpdateRetry(ctxPtr *baseOsMgrContext, status types.ZedAgentStatus) bool {
+
+	curPartName := zboot.GetCurrentPartition()
+	partStatus := getZbootStatus(ctxPtr, curPartName)
+	if partStatus == nil {
+		log.Warnf("No current partition status for %s; ignoring RetryUpdateCounter",
+			curPartName)
+		return false
+	}
+	if partStatus.PartitionState != "active" {
+		log.Warnf("Current partition state %s not active; ignoring RetryUpdateCounter",
+			partStatus.PartitionState)
+		return false
+	}
+	shortVerCurPart := partStatus.ShortVersion
+	otherPartName := zboot.GetOtherPartition()
+	partStatus = getZbootStatus(ctxPtr, otherPartName)
+	if partStatus == nil {
+		log.Warnf("No other partition status for %s; ignoring RetryUpdateCounter",
+			otherPartName)
+		return false
+	}
+	shortVerOtherPart := partStatus.ShortVersion
+	if shortVerOtherPart == "" {
+		log.Warnf("Other partition has no version; ignoring RetryUpdateCounter")
+		return false
+	}
+	if partStatus.PartitionState != "inprogress" {
+		log.Warnf("Other partition state %s not inprogress; ignoring RetryUpdateCounter",
+			partStatus.PartitionState)
+		return false
+	}
+	baseOSConfig := lookupBaseOsConfigByVersion(ctxPtr, shortVerOtherPart)
+	if baseOSConfig == nil {
+		log.Warnf("Cannot found BaseOsConfig with %s version; ignoring RetryUpdateCounter",
+			shortVerOtherPart)
+		return false
+	}
+	if !baseOSConfig.Activate {
+		log.Warnf("BaseOsConfig %s has no activate; ignoring RetryUpdateCounter", baseOSConfig.Key())
+		return false
+	}
+	log.Noticef("RetryUpdateCounter from %s to %s",
+		shortVerCurPart, shortVerOtherPart)
+
+	zboot.SetOtherPartitionStateUpdating(log)
+	updateAndPublishZbootStatus(ctxPtr, partStatus.PartitionLabel, false)
+	baseOsStatus := lookupBaseOsStatusByPartLabel(ctxPtr, partStatus.PartitionLabel)
+	if baseOsStatus != nil {
+		baseOsSetPartitionInfoInStatus(ctxPtr, baseOsStatus, partStatus.PartitionLabel)
+		publishBaseOsStatus(ctxPtr, baseOsStatus)
+	}
+	return true
+}
+
+func lookupBaseOsConfigByVersion(ctxPtr *baseOsMgrContext, shortVersion string) *types.BaseOsConfig {
+	sub := ctxPtr.subBaseOsConfig
+	items := sub.GetAll()
+	for _, cfg := range items {
+		baseOSConfig := cfg.(types.BaseOsConfig)
+		if baseOSConfig.BaseOsVersion == shortVersion {
+			return &baseOSConfig
+		}
+	}
+	return nil
 }

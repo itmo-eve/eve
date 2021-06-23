@@ -124,6 +124,19 @@ var baseosPrevConfigHash []byte
 func parseBaseOsConfig(getconfigCtx *getconfigContext,
 	config *zconfig.EdgeDevConfig) {
 
+	baseOS := config.GetBaseos()
+	var newRetryUpdateCounter uint32
+	if baseOS != nil && baseOS.GetRetryUpdate() != nil {
+		newRetryUpdateCounter = baseOS.GetRetryUpdate().GetCounter()
+	}
+
+	if newRetryUpdateCounter != getconfigCtx.retryUpdateCounter {
+		log.Noticef("Controller retryUpdateCounter changed from %d to %d",
+			getconfigCtx.retryUpdateCounter, newRetryUpdateCounter)
+		getconfigCtx.retryUpdateCounter = newRetryUpdateCounter
+		publishZedAgentStatus(getconfigCtx)
+	}
+
 	cfgOsList := config.GetBase()
 	h := sha256.New()
 	for _, os := range cfgOsList {

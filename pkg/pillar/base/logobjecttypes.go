@@ -60,6 +60,8 @@ const (
 	ZbootConfigLogType LogObjectType = "zboot_config"
 	// ZbootStatusLogType :
 	ZbootStatusLogType LogObjectType = "zboot_status"
+	// BaseOSMgrStatusLogType :
+	BaseOSMgrStatusLogType LogObjectType = "baseosmgr_status"
 	// DownloaderConfigLogType :
 	DownloaderConfigLogType LogObjectType = "downloader_config"
 	// DownloaderStatusLogType :

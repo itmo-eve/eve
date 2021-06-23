@@ -10,7 +10,9 @@ package baseosmgr
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/lf-edge/eve/pkg/pillar/agentlog"
@@ -28,6 +30,8 @@ const (
 	// Time limits for event loop handlers
 	errorTime   = 3 * time.Minute
 	warningTime = 40 * time.Second
+
+	lastRetryUpdateCounterFile = types.PersistStatusDir + "/retryupdate"
 )
 
 // Set from Makefile
@@ -37,6 +41,7 @@ type baseOsMgrContext struct {
 	pubBaseOsStatus      pubsub.Publication
 	pubContentTreeConfig pubsub.Publication
 	pubZbootStatus       pubsub.Publication
+	pubBaseOsMgrStatus   pubsub.Publication
 
 	subGlobalConfig      pubsub.Subscription
 	globalConfig         *types.ConfigItemValueMap
@@ -49,6 +54,8 @@ type baseOsMgrContext struct {
 	rebootReason         string    // From last reboot
 	rebootTime           time.Time // From last reboot
 	rebootImage          string    // Image from which the last reboot happened
+	currentUpdateRetry   uint32
+	configUpdateRetry    uint32
 
 	worker worker.Worker // For background work
 }
@@ -89,6 +96,8 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 	ctx := baseOsMgrContext{
 		globalConfig: types.DefaultConfigItemValueMap(),
 	}
+
+	ctx.currentUpdateRetry = readSavedRetryUpdateCounter()
 
 	// initialize publishing handles
 	initializeSelfPublishHandles(ps, &ctx)
@@ -312,6 +321,17 @@ func initializeSelfPublishHandles(ps *pubsub.PubSub, ctx *baseOsMgrContext) {
 	}
 	pubZbootStatus.ClearRestarted()
 	ctx.pubZbootStatus = pubZbootStatus
+
+	pubBaseOsMgrStatus, err := ps.NewPublication(
+		pubsub.PublicationOptions{
+			AgentName: agentName,
+			TopicType: types.BaseOSMgrStatus{},
+		})
+	if err != nil {
+		log.Fatal(err)
+	}
+	pubBaseOsMgrStatus.ClearRestarted()
+	ctx.pubBaseOsMgrStatus = pubBaseOsMgrStatus
 }
 
 func initializeGlobalConfigHandles(ps *pubsub.PubSub, ctx *baseOsMgrContext) {
@@ -514,4 +534,29 @@ func handleZbootConfigDelete(ctxArg interface{}, key string,
 	// Nothing to do. We report ZbootStatus for the IMG* partitions
 	// in any case
 	log.Functionf("handleZbootConfigDelete(%s) done", key)
+}
+
+// returns retryUpdateCounter if the file exists
+// else returns 0
+func readSavedRetryUpdateCounter() uint32 {
+	log.Tracef("readSavedRetryUpdateCounter - reading %s", lastRetryUpdateCounterFile)
+
+	b, err := ioutil.ReadFile(lastRetryUpdateCounterFile)
+	if err == nil {
+		c, err := strconv.Atoi(string(b))
+		if err != nil {
+			log.Errorf("readSavedRetryUpdateCounter: %s", err)
+		}
+		return uint32(c)
+	}
+	log.Functionf("readSavedRetryUpdateCounter - %s doesn't exist", lastRetryUpdateCounterFile)
+	return 0
+}
+
+func saveRetryUpdateCounter(retryUpdateCounter uint32) {
+	log.Functionf("saveRetryUpdateCounter - RetryUpdateCounter: %d", retryUpdateCounter)
+	err := ioutil.WriteFile(lastRetryUpdateCounterFile, []byte(fmt.Sprintf("%d", retryUpdateCounter)), 0644)
+	if err != nil {
+		log.Errorf("saveRetryUpdateCounter write: %s", err)
+	}
 }

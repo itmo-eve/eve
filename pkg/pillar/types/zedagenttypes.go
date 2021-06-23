@@ -488,6 +488,7 @@ type ZedAgentStatus struct {
 	MaintenanceMode      bool       // Don't run apps etc
 	ForceFallbackCounter int        // Try image fallback when counter changes
 	CurrentProfile       string     // Current profile
+	BaseosUpdateCounter  uint32     // Current BaseosUpdateCounter from config
 }
 
 // Key :
