@@ -540,3 +540,8 @@ type DeviceOpsCmd struct {
 	DesiredState bool
 	OpsTime      string
 }
+
+// BaseOSMgrStatus : for sending from baseosmgr
+type BaseOSMgrStatus struct {
+	BaseosUpdateCounter uint32 // Current BaseosUpdateCounter from baseosmgr
+}

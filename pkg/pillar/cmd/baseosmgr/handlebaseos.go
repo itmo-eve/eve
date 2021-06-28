@@ -750,14 +750,6 @@ func publishBaseOsStatus(ctx *baseOsMgrContext, status *types.BaseOsStatus) {
 	pub.Publish(key, *status)
 }
 
-func publishBaseOsMgrStatus(ctx *baseOsMgrContext, status *types.BaseOSMgrStatus) {
-
-	key := status.Key()
-	log.Tracef("Publishing BaseOSMgrStatus %s", key)
-	pub := ctx.pubBaseOsMgrStatus
-	pub.Publish(key, *status)
-}
-
 func unpublishBaseOsStatus(ctx *baseOsMgrContext, key string) {
 
 	log.Tracef("Unpublishing BaseOsStatus %s", key)
@@ -833,13 +825,10 @@ func handleZbootTestComplete(ctx *baseOsMgrContext, config types.ZbootConfig,
 		// Check if we have a failed update which needs a kick
 		maybeRetryInstall(ctx)
 
+		//sync currentUpdateRetry
 		ctx.currentUpdateRetry = ctx.configUpdateRetry
 
-		ctx.pubBaseOsMgrStatus.Publish(agentName,
-			&types.BaseOSMgrStatus{
-				Name:                agentName,
-				BaseosUpdateCounter: ctx.currentUpdateRetry,
-			})
+		publishBaseOSMgrStatus(ctx)
 
 		log.Functionf("handleZbootTestComplete(%s) to True done",
 			config.Key())

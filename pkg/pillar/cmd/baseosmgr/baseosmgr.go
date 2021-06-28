@@ -560,3 +560,11 @@ func saveRetryUpdateCounter(retryUpdateCounter uint32) {
 		log.Errorf("saveRetryUpdateCounter write: %s", err)
 	}
 }
+
+func publishBaseOSMgrStatus(ctx *baseOsMgrContext) {
+	log.Function("publishBaseOSMgrStatus")
+	ctx.pubBaseOsMgrStatus.Publish("global",
+		types.BaseOSMgrStatus{
+			BaseosUpdateCounter: ctx.currentUpdateRetry,
+		})
+}

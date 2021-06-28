@@ -49,11 +49,7 @@ func handleZedAgentStatusImpl(ctxArg interface{}, key string,
 			ctxPtr.currentUpdateRetry = status.BaseosUpdateCounter
 		}
 		saveRetryUpdateCounter(ctxPtr.currentUpdateRetry)
-		ctxPtr.pubBaseOsMgrStatus.Publish(agentName,
-			&types.BaseOSMgrStatus{
-				Name:                agentName,
-				BaseosUpdateCounter: ctxPtr.currentUpdateRetry,
-			})
+		publishBaseOSMgrStatus(ctxPtr)
 	}
 	ctxPtr.configUpdateRetry = status.BaseosUpdateCounter
 
