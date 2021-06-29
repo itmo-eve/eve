@@ -86,6 +86,7 @@ func parseConfig(config *zconfig.EdgeDevConfig, getconfigCtx *getconfigContext,
 		// publish updated configuration.
 		forceSystemAdaptersParse := physioChanged || networksChanged
 		parseSystemAdapterConfig(config, getconfigCtx, forceSystemAdaptersParse)
+		parseBaseOS(getconfigCtx, config)
 		parseBaseOsConfig(getconfigCtx, config)
 		parseNetworkInstanceConfig(config, getconfigCtx)
 		parseContentInfoConfig(getconfigCtx, config)
@@ -117,6 +118,23 @@ func shutdownApps(getconfigCtx *getconfigContext) {
 
 func shutdownAppsGlobal(ctx *zedagentContext) {
 	shutdownApps(ctx.getconfigCtx)
+}
+
+func parseBaseOS(getconfigCtx *getconfigContext,
+	config *zconfig.EdgeDevConfig) {
+
+	baseOS := config.GetBaseos()
+	var newRetryUpdateCounter uint32
+	if baseOS != nil && baseOS.GetRetryUpdate() != nil {
+		newRetryUpdateCounter = baseOS.GetRetryUpdate().GetCounter()
+	}
+
+	if newRetryUpdateCounter != getconfigCtx.retryUpdateCounter {
+		log.Noticef("Controller retryUpdateCounter changed from %d to %d",
+			getconfigCtx.retryUpdateCounter, newRetryUpdateCounter)
+		getconfigCtx.retryUpdateCounter = newRetryUpdateCounter
+		publishZedAgentStatus(getconfigCtx)
+	}
 }
 
 var baseosPrevConfigHash []byte

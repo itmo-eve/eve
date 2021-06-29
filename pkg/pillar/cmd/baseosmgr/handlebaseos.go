@@ -825,6 +825,9 @@ func handleZbootTestComplete(ctx *baseOsMgrContext, config types.ZbootConfig,
 		// Check if we have a failed update which needs a kick
 		maybeRetryInstall(ctx)
 
+		//sync currentUpdateRetry
+		handleUpdateRetryCounter(ctx, ctx.configUpdateRetry)
+
 		log.Functionf("handleZbootTestComplete(%s) to True done",
 			config.Key())
 		return
@@ -1017,4 +1020,106 @@ func handleOtherPartRebootReason(ctxPtr *baseOsMgrContext, status *types.BaseOsS
 			dateStr)
 		status.SetError(reason, ctxPtr.rebootTime)
 	}
+}
+
+//isImageInErrorState returns true if we try to update to IMGB without success
+//also returns ZbootStatus
+func isImageInErrorState(ctxPtr *baseOsMgrContext) (bool, *types.ZbootStatus) {
+	otherPartName := zboot.GetOtherPartition()
+	partStatus := getZbootStatus(ctxPtr, otherPartName)
+	if partStatus == nil {
+		log.Functionf("No other partition status for %s",
+			otherPartName)
+		return false, nil
+	}
+	shortVerOtherPart := partStatus.ShortVersion
+	if shortVerOtherPart == "" {
+		log.Functionf("Other partition has no version")
+		return false, partStatus
+	}
+	if partStatus.PartitionState != "inprogress" {
+		log.Functionf("Other partition state %s not inprogress",
+			partStatus.PartitionState)
+		return false, partStatus
+	}
+	baseOSConfig := lookupBaseOsConfigByVersion(ctxPtr, shortVerOtherPart)
+	if baseOSConfig == nil {
+		log.Functionf("Cannot found BaseOsConfig with %s version; ignoring RetryUpdateCounter",
+			shortVerOtherPart)
+		return false, partStatus
+	}
+	if !baseOSConfig.Activate {
+		log.Functionf("BaseOsConfig %s has no activate; ignoring RetryUpdateCounter", baseOSConfig.Key())
+		return false, partStatus
+	}
+	return true, partStatus
+}
+
+// handleUpdateRetryCounter checks if RetryUpdateCounter changed and if so
+// set other partition state to updating
+func handleUpdateRetryCounter(ctxPtr *baseOsMgrContext, retryUpdateCounter uint32) {
+	curPartName := zboot.GetCurrentPartition()
+	partStatus := getZbootStatus(ctxPtr, curPartName)
+	if partStatus == nil {
+		log.Warnf("handleUpdateRetryCounter: No current partition status for %s; failed RetryUpdateCounter",
+			curPartName)
+		return
+	}
+	if partStatus.PartitionState != "active" {
+		if ctxPtr.configUpdateRetry == retryUpdateCounter {
+			log.Functionf("No change in retryUpdateCounter: %d", retryUpdateCounter)
+			return
+		}
+		log.Noticef("handleUpdateRetryCounter: configUpdateRetry change: %d to %d",
+			ctxPtr.configUpdateRetry, retryUpdateCounter)
+		ctxPtr.configUpdateRetry = retryUpdateCounter
+		return
+	}
+	if failed, failedPartStatus := isImageInErrorState(ctxPtr); failed {
+		if ctxPtr.configUpdateRetry == retryUpdateCounter {
+			log.Functionf("No change in retryUpdateCounter: %d", retryUpdateCounter)
+			return
+		}
+		log.Noticef("handleUpdateRetryCounter: configUpdateRetry change: %d to %d",
+			ctxPtr.configUpdateRetry, retryUpdateCounter)
+		ctxPtr.configUpdateRetry = retryUpdateCounter
+		saveRetryUpdateCounter(false, ctxPtr.currentUpdateRetry)
+		// save it to avoid loop of re-upgrade - failing - re-upgrade
+		saveRetryUpdateCounter(true, ctxPtr.configUpdateRetry)
+		log.Noticef("UpdateRetry from %s to %s",
+			partStatus.ShortVersion, failedPartStatus.ShortVersion)
+		zboot.SetOtherPartitionStateUpdating(log)
+		updateAndPublishZbootStatus(ctxPtr, failedPartStatus.PartitionLabel, false)
+		baseOsStatus := lookupBaseOsStatusByPartLabel(ctxPtr, failedPartStatus.PartitionLabel)
+		if baseOsStatus != nil {
+			baseOsSetPartitionInfoInStatus(ctxPtr, baseOsStatus, failedPartStatus.PartitionLabel)
+			publishBaseOsStatus(ctxPtr, baseOsStatus)
+		}
+		return
+	}
+	if ctxPtr.configUpdateRetry != retryUpdateCounter {
+		log.Noticef("handleUpdateRetryCounter: configUpdateRetry change: %d to %d",
+			ctxPtr.configUpdateRetry, retryUpdateCounter)
+		ctxPtr.configUpdateRetry = retryUpdateCounter
+		saveRetryUpdateCounter(true, ctxPtr.configUpdateRetry)
+	}
+	if ctxPtr.currentUpdateRetry != retryUpdateCounter {
+		log.Noticef("handleUpdateRetryCounter: currentUpdateRetry change: %d to %d",
+			ctxPtr.currentUpdateRetry, retryUpdateCounter)
+		ctxPtr.currentUpdateRetry = retryUpdateCounter
+		saveRetryUpdateCounter(false, ctxPtr.currentUpdateRetry)
+	}
+	publishBaseOSMgrStatus(ctxPtr)
+}
+
+func lookupBaseOsConfigByVersion(ctxPtr *baseOsMgrContext, shortVersion string) *types.BaseOsConfig {
+	sub := ctxPtr.subBaseOsConfig
+	items := sub.GetAll()
+	for _, cfg := range items {
+		baseOSConfig := cfg.(types.BaseOsConfig)
+		if baseOSConfig.BaseOsVersion == shortVersion {
+			return &baseOSConfig
+		}
+	}
+	return nil
 }

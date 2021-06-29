@@ -40,6 +40,9 @@ func handleZedAgentStatusImpl(ctxArg interface{}, key string,
 	ctxPtr := ctxArg.(*baseOsMgrContext)
 	status := statusArg.(types.ZedAgentStatus)
 	handleForceFallback(ctxPtr, status)
+
+	handleUpdateRetryCounter(ctxPtr, status.BaseosUpdateCounter)
+
 	log.Functionf("handleZedAgentStatusImpl(%s) done", key)
 }
 

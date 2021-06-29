@@ -95,6 +95,7 @@ type zedagentContext struct {
 	TriggerObjectInfo         chan<- infoForObjectKey
 	zbootRestarted            bool // published by baseosmgr
 	subBaseOsStatus           pubsub.Subscription
+	subBaseOsMgrStatus        pubsub.Subscription
 	subNetworkInstanceMetrics pubsub.Subscription
 	subAppFlowMonitor         pubsub.Subscription
 	pubGlobalConfig           pubsub.Publication
@@ -918,6 +919,18 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 	zedagentCtx.subCapabilities = subCapabilities
 	subCapabilities.Activate()
 
+	subBaseOsMgrStatus, err := ps.NewSubscription(pubsub.SubscriptionOptions{
+		AgentName:   "baseosmgr",
+		MyAgentName: agentName,
+		TopicImpl:   types.BaseOSMgrStatus{},
+		Activate:    false,
+		Ctx:         &zedagentCtx,
+		WarningTime: warningTime,
+		ErrorTime:   errorTime,
+	})
+	zedagentCtx.subBaseOsMgrStatus = subBaseOsMgrStatus
+	subBaseOsMgrStatus.Activate()
+
 	//initialize cipher processing block
 	cipherModuleInitialize(&zedagentCtx, ps)
 
@@ -1331,6 +1344,9 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 
 		case change := <-subCapabilities.MsgChan():
 			subCapabilities.ProcessChange(change)
+
+		case change := <-subBaseOsMgrStatus.MsgChan():
+			subBaseOsMgrStatus.ProcessChange(change)
 
 		case <-stillRunning.C:
 			// Fault injection

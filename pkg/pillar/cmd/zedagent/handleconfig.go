@@ -73,6 +73,7 @@ type getconfigContext struct {
 	globalProfile            string
 	localProfile             string
 	localProfileTrigger      chan Notify
+	retryUpdateCounter       uint32
 
 	callProcessLocalProfileServerChange bool //did we already call processLocalProfileServerChange
 }
@@ -571,6 +572,7 @@ func publishZedAgentStatus(getconfigCtx *getconfigContext) {
 		MaintenanceMode:      ctx.maintenanceMode,
 		ForceFallbackCounter: ctx.forceFallbackCounter,
 		CurrentProfile:       getconfigCtx.currentProfile,
+		BaseosUpdateCounter:  getconfigCtx.retryUpdateCounter,
 	}
 	pub := getconfigCtx.pubZedAgentStatus
 	pub.Publish(agentName, status)

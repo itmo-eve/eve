@@ -10,7 +10,9 @@ package baseosmgr
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/lf-edge/eve/pkg/pillar/agentlog"
@@ -28,6 +30,9 @@ const (
 	// Time limits for event loop handlers
 	errorTime   = 3 * time.Minute
 	warningTime = 40 * time.Second
+
+	currentRetryUpdateCounterFile = types.PersistStatusDir + "/currentretryupdate" // last value before re-upgrade
+	cfgRetryUpdateCounterFile     = types.PersistStatusDir + "/cfgretryupdate"     // last value from config
 )
 
 // Set from Makefile
@@ -37,6 +42,7 @@ type baseOsMgrContext struct {
 	pubBaseOsStatus      pubsub.Publication
 	pubContentTreeConfig pubsub.Publication
 	pubZbootStatus       pubsub.Publication
+	pubBaseOsMgrStatus   pubsub.Publication
 
 	subGlobalConfig      pubsub.Subscription
 	globalConfig         *types.ConfigItemValueMap
@@ -49,6 +55,8 @@ type baseOsMgrContext struct {
 	rebootReason         string    // From last reboot
 	rebootTime           time.Time // From last reboot
 	rebootImage          string    // Image from which the last reboot happened
+	currentUpdateRetry   uint32
+	configUpdateRetry    uint32
 
 	worker worker.Worker // For background work
 }
@@ -92,6 +100,10 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 
 	// initialize publishing handles
 	initializeSelfPublishHandles(ps, &ctx)
+
+	ctx.currentUpdateRetry = readSavedRetryUpdateCounter(false)
+	ctx.configUpdateRetry = readSavedRetryUpdateCounter(true)
+	publishBaseOSMgrStatus(&ctx)
 
 	// initialize module specific subscriber handles
 	initializeGlobalConfigHandles(ps, &ctx)
@@ -312,6 +324,17 @@ func initializeSelfPublishHandles(ps *pubsub.PubSub, ctx *baseOsMgrContext) {
 	}
 	pubZbootStatus.ClearRestarted()
 	ctx.pubZbootStatus = pubZbootStatus
+
+	pubBaseOsMgrStatus, err := ps.NewPublication(
+		pubsub.PublicationOptions{
+			AgentName: agentName,
+			TopicType: types.BaseOSMgrStatus{},
+		})
+	if err != nil {
+		log.Fatal(err)
+	}
+	pubBaseOsMgrStatus.ClearRestarted()
+	ctx.pubBaseOsMgrStatus = pubBaseOsMgrStatus
 }
 
 func initializeGlobalConfigHandles(ps *pubsub.PubSub, ctx *baseOsMgrContext) {
@@ -514,4 +537,45 @@ func handleZbootConfigDelete(ctxArg interface{}, key string,
 	// Nothing to do. We report ZbootStatus for the IMG* partitions
 	// in any case
 	log.Functionf("handleZbootConfigDelete(%s) done", key)
+}
+
+// returns retryUpdateCounter if the file exists
+// else returns 0
+func readSavedRetryUpdateCounter(fromConfig bool) uint32 {
+	fileName := currentRetryUpdateCounterFile
+	if fromConfig {
+		fileName = cfgRetryUpdateCounterFile
+	}
+	log.Tracef("readSavedRetryUpdateCounter - reading %s", fileName)
+
+	b, err := ioutil.ReadFile(fileName)
+	if err == nil {
+		c, err := strconv.Atoi(string(b))
+		if err != nil {
+			log.Errorf("readSavedRetryUpdateCounter: %s", err)
+		}
+		return uint32(c)
+	}
+	log.Functionf("readSavedRetryUpdateCounter - %s doesn't exist", fileName)
+	return 0
+}
+
+func saveRetryUpdateCounter(fromConfig bool, retryUpdateCounter uint32) {
+	fileName := currentRetryUpdateCounterFile
+	if fromConfig {
+		fileName = cfgRetryUpdateCounterFile
+	}
+	log.Functionf("saveRetryUpdateCounter - RetryUpdateCounter: %d", retryUpdateCounter)
+	err := ioutil.WriteFile(fileName, []byte(fmt.Sprintf("%d", retryUpdateCounter)), 0644)
+	if err != nil {
+		log.Errorf("saveRetryUpdateCounter write: %s", err)
+	}
+}
+
+func publishBaseOSMgrStatus(ctx *baseOsMgrContext) {
+	log.Function("publish BaseOSMgrStatus")
+	ctx.pubBaseOsMgrStatus.Publish("global",
+		types.BaseOSMgrStatus{
+			BaseosUpdateCounter: ctx.currentUpdateRetry,
+		})
 }
