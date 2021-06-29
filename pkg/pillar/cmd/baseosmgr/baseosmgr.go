@@ -31,7 +31,8 @@ const (
 	errorTime   = 3 * time.Minute
 	warningTime = 40 * time.Second
 
-	lastRetryUpdateCounterFile = types.PersistStatusDir + "/retryupdate"
+	currentRetryUpdateCounterFile = types.PersistStatusDir + "/currentretryupdate" // last value before re-upgrade
+	cfgRetryUpdateCounterFile     = types.PersistStatusDir + "/cfgretryupdate"     // last value from config
 )
 
 // Set from Makefile
@@ -97,10 +98,12 @@ func Run(ps *pubsub.PubSub, loggerArg *logrus.Logger, logArg *base.LogObject) in
 		globalConfig: types.DefaultConfigItemValueMap(),
 	}
 
-	ctx.currentUpdateRetry = readSavedRetryUpdateCounter()
-
 	// initialize publishing handles
 	initializeSelfPublishHandles(ps, &ctx)
+
+	ctx.currentUpdateRetry = readSavedRetryUpdateCounter(false)
+	ctx.configUpdateRetry = readSavedRetryUpdateCounter(true)
+	publishBaseOSMgrStatus(&ctx)
 
 	// initialize module specific subscriber handles
 	initializeGlobalConfigHandles(ps, &ctx)
@@ -538,10 +541,14 @@ func handleZbootConfigDelete(ctxArg interface{}, key string,
 
 // returns retryUpdateCounter if the file exists
 // else returns 0
-func readSavedRetryUpdateCounter() uint32 {
-	log.Tracef("readSavedRetryUpdateCounter - reading %s", lastRetryUpdateCounterFile)
+func readSavedRetryUpdateCounter(fromConfig bool) uint32 {
+	fileName := currentRetryUpdateCounterFile
+	if fromConfig {
+		fileName = cfgRetryUpdateCounterFile
+	}
+	log.Tracef("readSavedRetryUpdateCounter - reading %s", fileName)
 
-	b, err := ioutil.ReadFile(lastRetryUpdateCounterFile)
+	b, err := ioutil.ReadFile(fileName)
 	if err == nil {
 		c, err := strconv.Atoi(string(b))
 		if err != nil {
@@ -549,20 +556,24 @@ func readSavedRetryUpdateCounter() uint32 {
 		}
 		return uint32(c)
 	}
-	log.Functionf("readSavedRetryUpdateCounter - %s doesn't exist", lastRetryUpdateCounterFile)
+	log.Functionf("readSavedRetryUpdateCounter - %s doesn't exist", fileName)
 	return 0
 }
 
-func saveRetryUpdateCounter(retryUpdateCounter uint32) {
+func saveRetryUpdateCounter(fromConfig bool, retryUpdateCounter uint32) {
+	fileName := currentRetryUpdateCounterFile
+	if fromConfig {
+		fileName = cfgRetryUpdateCounterFile
+	}
 	log.Functionf("saveRetryUpdateCounter - RetryUpdateCounter: %d", retryUpdateCounter)
-	err := ioutil.WriteFile(lastRetryUpdateCounterFile, []byte(fmt.Sprintf("%d", retryUpdateCounter)), 0644)
+	err := ioutil.WriteFile(fileName, []byte(fmt.Sprintf("%d", retryUpdateCounter)), 0644)
 	if err != nil {
 		log.Errorf("saveRetryUpdateCounter write: %s", err)
 	}
 }
 
 func publishBaseOSMgrStatus(ctx *baseOsMgrContext) {
-	log.Function("publishBaseOSMgrStatus")
+	log.Function("publish BaseOSMgrStatus")
 	ctx.pubBaseOsMgrStatus.Publish("global",
 		types.BaseOSMgrStatus{
 			BaseosUpdateCounter: ctx.currentUpdateRetry,

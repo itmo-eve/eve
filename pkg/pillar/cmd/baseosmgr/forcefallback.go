@@ -41,17 +41,7 @@ func handleZedAgentStatusImpl(ctxArg interface{}, key string,
 	status := statusArg.(types.ZedAgentStatus)
 	handleForceFallback(ctxPtr, status)
 
-	if ctxPtr.currentUpdateRetry != status.BaseosUpdateCounter {
-		log.Functionf("No change to RetryUpdateCounter %d", status.BaseosUpdateCounter)
-		if !handleUpdateRetry(ctxPtr, status) {
-			log.Noticef("RetryUpdateCounter updated from %d to %d",
-				ctxPtr.currentUpdateRetry, status.BaseosUpdateCounter)
-			ctxPtr.currentUpdateRetry = status.BaseosUpdateCounter
-		}
-		saveRetryUpdateCounter(ctxPtr.currentUpdateRetry)
-		publishBaseOSMgrStatus(ctxPtr)
-	}
-	ctxPtr.configUpdateRetry = status.BaseosUpdateCounter
+	handleUpdateRetryCounter(ctxPtr, status.BaseosUpdateCounter)
 
 	log.Functionf("handleZedAgentStatusImpl(%s) done", key)
 }

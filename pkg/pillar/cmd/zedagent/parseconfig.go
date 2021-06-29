@@ -86,6 +86,7 @@ func parseConfig(config *zconfig.EdgeDevConfig, getconfigCtx *getconfigContext,
 		// publish updated configuration.
 		forceSystemAdaptersParse := physioChanged || networksChanged
 		parseSystemAdapterConfig(config, getconfigCtx, forceSystemAdaptersParse)
+		parseBaseOS(getconfigCtx, config)
 		parseBaseOsConfig(getconfigCtx, config)
 		parseNetworkInstanceConfig(config, getconfigCtx)
 		parseContentInfoConfig(getconfigCtx, config)
@@ -119,9 +120,7 @@ func shutdownAppsGlobal(ctx *zedagentContext) {
 	shutdownApps(ctx.getconfigCtx)
 }
 
-var baseosPrevConfigHash []byte
-
-func parseBaseOsConfig(getconfigCtx *getconfigContext,
+func parseBaseOS(getconfigCtx *getconfigContext,
 	config *zconfig.EdgeDevConfig) {
 
 	baseOS := config.GetBaseos()
@@ -136,6 +135,12 @@ func parseBaseOsConfig(getconfigCtx *getconfigContext,
 		getconfigCtx.retryUpdateCounter = newRetryUpdateCounter
 		publishZedAgentStatus(getconfigCtx)
 	}
+}
+
+var baseosPrevConfigHash []byte
+
+func parseBaseOsConfig(getconfigCtx *getconfigContext,
+	config *zconfig.EdgeDevConfig) {
 
 	cfgOsList := config.GetBase()
 	h := sha256.New()
