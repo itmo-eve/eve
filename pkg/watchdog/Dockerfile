@@ -1,6 +1,6 @@
 # Build watchdogd for alpine
 
-FROM lfedge/eve-alpine:6.7.0 AS watchdog-build
+FROM lfedge/eve-alpine:7d3b7134bb4ad672a85f0bf71822c9db80724983 AS watchdog-build
 ENV BUILD_PKGS build-base file libtirpc-dev linux-headers tar
 ENV PKGS alpine-baselayout musl-utils
 RUN eve-alpine-deploy.sh

@@ -1,4 +1,4 @@
-FROM lfedge/eve-alpine:6.7.0 AS build
+FROM lfedge/eve-alpine:7d3b7134bb4ad672a85f0bf71822c9db80724983 AS build
 ENV BUILD_PKGS gcc linux-headers libc-dev libpcap-dev go python2-dev libffi-dev openssl-dev patch
 ENV PKGS libffi libpcap python2 openssl iproute2 keyutils tini
 RUN eve-alpine-deploy.sh

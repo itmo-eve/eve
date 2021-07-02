@@ -1,4 +1,4 @@
-FROM lfedge/eve-alpine:6.7.0 as build
+FROM lfedge/eve-alpine:7d3b7134bb4ad672a85f0bf71822c9db80724983 as build
 ENV BUILD_PKGS cairo-dev jpeg-dev libpng-dev gcc make libc-dev openssl-dev libvncserver-dev file patch
 ENV PKGS alpine-baselayout musl-utils libtasn1-progs p11-kit cairo jpeg libpng openssl libvncserver
 RUN eve-alpine-deploy.sh

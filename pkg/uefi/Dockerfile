@@ -9,7 +9,7 @@
 #   git clone https://git.linaro.org/uefi/uefi-tools.git
 #   ./uefi-tools/edk2-build.sh -b DEBUG -b RELEASE all
 #
-ARG EVE_BUILDER_IMAGE=lfedge/eve-alpine:6.7.0
+ARG EVE_BUILDER_IMAGE=lfedge/eve-alpine:7d3b7134bb4ad672a85f0bf71822c9db80724983
 # hadolint ignore=DL3006
 FROM ${EVE_BUILDER_IMAGE} as build
 ENV BUILD_PKGS curl make gcc g++ python3 libuuid nasm util-linux-dev bash git util-linux patch
@@ -23,7 +23,10 @@ WORKDIR /ws
 RUN git submodule update --init
 COPY build.sh /ws/
 COPY patch /ws/patch
-RUN bash -c 'patch -p0 < patch/*'
+RUN set -e && for patch in patch/*.patch; do \
+        echo "Applying $patch"; \
+        patch -p1 < "$patch"; \
+    done
 RUN ln -s python3 /usr/bin/python
 RUN ./build.sh
 

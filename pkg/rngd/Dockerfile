@@ -1,4 +1,4 @@
-FROM lfedge/eve-alpine:6.7.0 AS build
+FROM lfedge/eve-alpine:7d3b7134bb4ad672a85f0bf71822c9db80724983 AS build
 ENV BUILD_PKGS go gcc musl-dev linux-headers
 RUN eve-alpine-deploy.sh
 

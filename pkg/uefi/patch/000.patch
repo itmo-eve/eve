@@ -1,5 +1,7 @@
---- OvmfPkg/PlatformPei/Xen.c.orig
-+++ OvmfPkg/PlatformPei/Xen.c
+diff --git a/OvmfPkg/PlatformPei/Xen.c b/OvmfPkg/PlatformPei/Xen.c
+index 104922c67e..f1eae10d2d 100644
+--- a/OvmfPkg/PlatformPei/Xen.c
++++ b/OvmfPkg/PlatformPei/Xen.c
 @@ -137,6 +137,10 @@ XenDetect (
        mXen = TRUE;
        return TRUE;

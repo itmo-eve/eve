@@ -6,7 +6,7 @@
 #    and the server
 
 #Build TPM2-TSS and TPM2-TOOLS
-FROM lfedge/eve-alpine:6.7.0 as build
+FROM lfedge/eve-alpine:7d3b7134bb4ad672a85f0bf71822c9db80724983 as build
 ENV BUILD_PKGS linux-headers git gcc g++ autoconf automake libtool doxygen make \
                openssl-dev protobuf-dev gnupg curl-dev patch
 ENV PKGS alpine-baselayout musl-utils
@@ -50,8 +50,8 @@ RUN make && cp vtpm_server /out/usr/bin/
 
 # install dependencies
 WORKDIR /usr/lib
-RUN cp libstdc++.so.6 libgcc_s.so.1 libprotobuf.so.24.0.0 /out/usr/lib/
-RUN ln -s libprotobuf.so.24.0.0 /out/usr/lib/libprotobuf.so.24
+RUN cp libstdc++.so.6 libgcc_s.so.1 libprotobuf.so.26.0.7 /out/usr/lib/
+RUN ln -s libprotobuf.so.26.0.7 /out/usr/lib/libprotobuf.so.26
 WORKDIR /usr/local/lib
 RUN cp libtss2-tctildr.so.0 libtss2-rc.so.0 libtss2-mu.so.0 libtss2-esys.so.0 \
        libtss2-sys.so.0.0.0 libtss2-sys.so.0 libtss2-tcti-device.so.0 /out/usr/local/lib/
