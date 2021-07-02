@@ -51,6 +51,7 @@ gnu-efi-dev
 gnupg
 gnutls
 grep
+gtk-doc
 hdparm
 iasl
 installkernel
@@ -88,14 +89,11 @@ libpciaccess-dev
 libpng
 libpng-dev
 librelp-dev
-libressl-dev
-libressl3.1-libcrypto
-libressl3.1-libssl
-libressl3.1-libtls
+libretls
 libseccomp-dev
 libssl1.1
 libtirpc-dev
-libtls-standalone
+libretls
 libtool
 libunwind-dev
 libusb
