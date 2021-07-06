@@ -183,11 +183,9 @@ func deviceWatcher(notifyChannel chan *zVolDeviceEvent) {
 			}
 		} else if event.Op&fsnotify.Remove != 0 {
 			_ = w.Remove(fileName)
-			dataset := zfs.GetDatasetByDevice(fileName)
 			notifyChannel <- &zVolDeviceEvent{
-				delete:  true,
-				device:  fileName,
-				dataset: dataset,
+				delete: true,
+				device: fileName,
 			}
 		}
 	}
