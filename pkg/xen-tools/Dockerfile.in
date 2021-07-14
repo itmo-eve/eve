@@ -15,16 +15,17 @@ RUN gcc -s -o /chroot2 /tmp/chroot2.c
 RUN gcc -s -o /hacf /tmp/hacf.c
 RUN mkinitfs -n -F base -i /init-initrd -o /runx-initrd
 
-FROM lfedge/eve-alpine:6.7.0 as build
+FROM lfedge/eve-alpine:d39317b44d29aff86046f174ff669d569ec60977 as build
 ENV BUILD_PKGS \
     gcc make libc-dev dev86 xz-dev perl bash python3-dev \
     gettext iasl util-linux-dev ncurses-dev glib-dev \
     pixman-dev libaio-dev yajl-dev argp-standalone \
     linux-headers git patch texinfo curl tar libcap-ng-dev \
-    attr-dev flex bison cmake libusb-dev
+    attr-dev flex bison cmake libusb-dev spice-dev
 ENV BUILD_PKGS_arm64 dtc-dev
 
-ENV PKGS alpine-baselayout musl-utils bash libaio libbz2 glib pixman yajl keyutils libusb xz-libs libuuid sudo
+ENV PKGS alpine-baselayout musl-utils bash libaio libbz2 glib pixman yajl keyutils libusb xz-libs libuuid sudo \
+    spice-server
 ENV PKGS_arm64 libfdt
 
 RUN eve-alpine-deploy.sh
