@@ -23,7 +23,7 @@ WORKDIR /ws
 RUN git submodule update --init
 COPY build.sh /ws/
 COPY patch /ws/patch
-RUN bash -c 'patch -p0 < patch/*'
+RUN cat /ws/patch/*.patch | patch -p1
 RUN ln -s python3 /usr/bin/python
 RUN ./build.sh
 
